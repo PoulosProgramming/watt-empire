@@ -3,6 +3,7 @@ import { CREDITS_PER_MWH, INCINERATOR_START_VO, QUESTS, TOXIC_CRISIS_MWH, UPGRAD
 import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../src/sim/economy';
 import { TICK_DT, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
+import { cityDemandRangeMW } from '../src/sim/power';
 import { newGame } from '../src/sim/state';
 
 const run = (s: ReturnType<typeof newGame>, seconds: number) => {
@@ -223,5 +224,16 @@ describe('odemykání', () => {
     expect(isUnlocked(s, 'regulator')).toBe(false);
     s.delivered = 250;
     expect(isUnlocked(s, 'regulator')).toBe(true);
+  });
+});
+
+describe('rozsah spotřeby města', () => {
+  it('na začátku je 7 až 14 MW a s prestiží roste', () => {
+    const s = newGame();
+    const r = cityDemandRangeMW(s);
+    expect(r.min).toBeCloseTo(7, 5);
+    expect(r.max).toBeCloseTo(14, 1);
+    s.delivered = 400; // prestiž 2
+    expect(cityDemandRangeMW(s).min).toBeCloseTo(7 * 1.25, 5);
   });
 });

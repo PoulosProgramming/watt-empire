@@ -3,6 +3,7 @@ import {
   AUTOSAVE_SECONDS,
   DEBUG_CREDITS_BONUS,
   DEBUG_SPEEDS,
+  INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
@@ -15,7 +16,7 @@ import {
 import { isDay } from '../sim/daynight';
 import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../sim/economy';
 import { TICK_DT, tick } from '../sim/game';
-import { batteryCapacityMWh, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
+import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
 import { newGame } from '../sim/state';
@@ -181,11 +182,13 @@ function render(): void {
   const mm = Math.floor((s.hour % 1) * 60).toString().padStart(2, '0');
   const dayNight = isDay(s.hour) ? '<span class="day">☀️ den</span>' : '<span class="night">🌙 noc</span>';
   const bcap = batteryCapacityMWh(s);
+  const range = cityDemandRangeMW(s);
   const overPct = Math.min(100, (s.overload / OVERLOAD_TOLERANCE_SECONDS) * 100);
   $('grid').innerHTML = `
     <div class="row"><span>Čas</span><b>Den ${s.day}, ${hh}:${mm} ${dayNight}</b></div>
     <div class="row"><span>Prestiž města</span><b>${prestige(s)}</b></div>
     <div class="row"><span>Spotřeba města</span><b>${fmt(l.demandMW)} MW</b></div>
+    <div class="row"><span>Rozsah spotřeby</span><b>${fmt(range.min)} (noc) – ${fmt(range.max)} MW (poledne)</b></div>
     <div class="row"><span>Výroba</span><b>${fmt(l.productionMW)} MW</b></div>
     <div class="row"><span>Dodáváme</span><b>${fmt(l.deliveredMW)} / ${lineCapacityMW(s)} MW (vedení)</b></div>
     <div class="row"><span>Baterie</span><b>${fmt(s.battery)} / ${bcap} MWh ${l.batteryFlowMW > 0.01 ? '⬆' : l.batteryFlowMW < -0.01 ? '⬇' : ''}</b></div>
@@ -220,7 +223,15 @@ function render(): void {
     const max = lvl >= def.maxLevel;
     const cost = upgradeCost(def.id, lvl);
     el.disabled = max || s.credits < cost;
-    el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${def.description}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
+    let desc = def.description;
+    if (def.id === 'power' && !max) {
+      const next = incineratorNominalMW(s) + INCINERATOR_POWER_STEP_MW;
+      if (next > range.max) desc = `⚠️ Po koupi ${next} MW, ale město vezme nejvýš ${fmt(range.max)} MW. Zbytek by se zbytečně pálil.`;
+      else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty.`;
+      else if (next > range.min) desc = `Po koupi ${next} MW. Město v noci bere jen ${fmt(range.min)} MW, přebytek ${fmt(next - range.min)} MW pak potřebuje mařič nebo baterii.`;
+      else desc = `Po koupi ${next} MW. Město ho vždy vezme (v noci aspoň ${fmt(range.min)} MW).`;
+    }
+    el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
 
   const chapterDone = QUESTS.every((q) => s.doneQuests.includes(q.id));
