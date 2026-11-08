@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
+import { runCrisis } from '../src/sim/quests';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
 import { newGame } from '../src/sim/state';
@@ -149,26 +150,13 @@ describe('spalovna', () => {
     expect(s.credits).toBeGreaterThanOrEqual(0);
   });
 
-  it('po splnění spouštěcího úkolu začne odpočet a krize se spustí sama za 15 s, bez autonomie', () => {
-    const s = newGame();
-    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== TOXIC_TRIGGER_QUEST);
-    s.upgrades.line = 2; // splní úkol "Posil dráty a trafo na úroveň 2"
-    s.vo = 100;
-    tick(s);
-    expect(s.doneQuests).toContain(TOXIC_TRIGGER_QUEST);
-    expect(s.live.autonomous).toBe(false); // na autonomii se nehledí
-    expect(s.toxic).toBe(false);
-    expect(s.toxicCountdown).toBeGreaterThan(0);
-    run(s, TOXIC_DELAY_SECONDS - 1);
-    expect(s.toxic).toBe(false);
-    run(s, 2);
-    expect(s.toxic).toBe(true);
-    expect(s.toxicCountdown).toBe(-1);
-  });
+  // Mechanismus krize je nachystaný pro kapitolu 2 (spouštěcí úkol je teď null), testuje se se zadaným úkolem
+  const TRIGGER = 'line2';
 
-  it('bez spouštěcího úkolu krize nezačne', () => {
+  it('v kapitole 1 se krize nespouští (spouštěcí úkol je null)', () => {
+    expect(TOXIC_TRIGGER_QUEST).toBeNull();
     const s = newGame();
-    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== TOXIC_TRIGGER_QUEST);
+    s.doneQuests = QUESTS.map((q) => q.id);
     s.vo = 100;
     s.delivered = 1000;
     run(s, 60);
@@ -176,11 +164,31 @@ describe('spalovna', () => {
     expect(s.toxicCountdown).toBe(-1);
   });
 
-  it('uložení, kde byl spouštěcí úkol splněn dřív, také spustí odpočet', () => {
+  it('po splnění spouštěcího úkolu začne odpočet a krize se spustí sama za 15 s', () => {
     const s = newGame();
-    s.doneQuests = [TOXIC_TRIGGER_QUEST];
-    tick(s);
+    s.doneQuests = [TRIGGER];
+    runCrisis(s, TICK_DT, TRIGGER);
+    expect(s.toxic).toBe(false);
     expect(s.toxicCountdown).toBeGreaterThan(0);
+    for (let t = 0; t < TOXIC_DELAY_SECONDS - 1; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
+    expect(s.toxic).toBe(false);
+    for (let t = 0; t < 2; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
+    expect(s.toxic).toBe(true);
+    expect(s.toxicCountdown).toBe(-1);
+  });
+
+  it('bez spouštěcího úkolu krize nezačne ani se zadaným spouštěčem', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== TRIGGER);
+    for (let t = 0; t < 60; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
+    expect(s.toxic).toBe(false);
+  });
+
+  it('starší uložení s už spuštěnou krizí se při načtení vyčistí', () => {
+    const old = JSON.stringify({ v: 1, state: { credits: 5, toxic: true, toxicCountdown: 3 } });
+    const s = deserialize(old)!;
+    expect(s.toxic).toBe(false);
+    expect(s.toxicCountdown).toBe(-1);
   });
 
   it('autonomie: 5 brigádníků stačí na 6 MW, 4 ne', () => {
@@ -391,7 +399,7 @@ describe('idle (offline dopočet)', () => {
 describe('průběžné úkoly', () => {
   it('jsou v seznamu až za hlavními úkoly', () => {
     const firstOngoing = QUESTS.findIndex((q) => q.ongoing);
-    expect(firstOngoing).toBeGreaterThan(QUESTS.findIndex((q) => q.id === TOXIC_TRIGGER_QUEST));
+    expect(firstOngoing).toBeGreaterThan(QUESTS.findIndex((q) => q.id === 'line2'));
     expect(QUESTS.slice(firstOngoing).every((q) => q.ongoing)).toBe(true);
   });
 
@@ -432,9 +440,9 @@ describe('brigádníci v kapitole 1', () => {
 });
 
 describe('pořadí úkolů', () => {
-  it('trigger krize je 15. hlavní úkol a účinnost má v hlavním řetězci tři úkoly před ním', () => {
+  it('line2 je 15. hlavní úkol a účinnost má v hlavním řetězci tři úkoly před ním', () => {
     const main = QUESTS.filter((q) => !q.ongoing);
-    expect(main[14].id).toBe(TOXIC_TRIGGER_QUEST);
+    expect(main[14].id).toBe('line2');
     const beforeTrigger = main.slice(0, 14).filter((q) => q.upgrade === 'efficiency').length;
     expect(beforeTrigger).toBe(3);
   });

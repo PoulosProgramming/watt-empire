@@ -22,11 +22,11 @@ export function checkQuests(s: GameState): void {
 
 
 // Ekologická krize: po splnění spouštěcího úkolu začne odpočet a krize se spustí sama (bez varování).
-// Funguje i pro uložení, kde byl úkol splněn dřív, než odpočet existoval.
-export function runCrisis(s: GameState, dt: number): void {
-  if (s.toxic) return;
+// Spouštěcí úkol je zatím null (krize patří až do kapitoly 2), proto se nic neděje.
+export function runCrisis(s: GameState, dt: number, triggerQuest: string | null = TOXIC_TRIGGER_QUEST): void {
+  if (s.toxic || !triggerQuest) return;
   if (s.toxicCountdown < 0) {
-    if (s.doneQuests.includes(TOXIC_TRIGGER_QUEST)) s.toxicCountdown = TOXIC_DELAY_SECONDS;
+    if (s.doneQuests.includes(triggerQuest)) s.toxicCountdown = TOXIC_DELAY_SECONDS;
     return;
   }
   s.toxicCountdown -= dt;

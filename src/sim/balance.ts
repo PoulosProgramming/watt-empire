@@ -49,7 +49,9 @@ export const BLACKOUT_SECONDS = 15;
 export const BLACKOUT_FEE = 60; // poplatek za nahození (nikdy nejde do mínusu)
 
 // ---- Ekologická krize (kapitola 1) ----
-export const TOXIC_TRIGGER_QUEST = 'line2'; // po splnění tohoto úkolu začne odpočet krize
+// Ekologická krize je nachystaná pro kapitolu 2. V kapitole 1 se nespouští (null), hráč řekl, že hru moc zpomalovala.
+// Až bude kapitola 2, nastav sem id úkolu, po jehož splnění krize začne.
+export const TOXIC_TRIGGER_QUEST: string | null = null;
 export const TOXIC_DELAY_SECONDS = 15; // krize se spustí sama za tolik sekund (bez předchozího varování)
 export const TOXIC_POPUP_TITLE = '☣️ Ekologická katastrofa!';
 export const TOXIC_POPUP_TEXT =
@@ -148,7 +150,7 @@ export const QUESTS: QuestDef[] = [
 export const STORY_INTRO =
   'Zamořený ostrov. Jediná věc, která tu ještě funguje, je stará spalovna odpadu. Městečko za kopcem je bez proudu a starosta tě prosí: roztoč spalovnu, vyčisti pláž a dodej městu elektřinu, než zhasne naposledy.';
 export const STORY_CHAPTER_END =
-  'Město svítí a ostrov dýchá, ale spalovna vyplivla toxický odpad a pod hladinou se probouzí něco většího. Konec kapitoly 1. V kapitole 2 přijde laboratoř, likvidátor odpadu a první soláry. Zatím jde hra dál ladit: dohraj poslední úkoly a pošli, co ti vadilo.';
+  'Město svítí a ostrov dýchá. Regulátor drží síť sám a tobě zbývá jen hlídat peníze. Jenže stará spalovna pálí odpad dál a pod hladinou se probouzí něco většího. Konec kapitoly 1. V kapitole 2 přijde laboratoř, likvidátor odpadu a první soláry. Zatím jde hra dál ladit: dohraj poslední úkoly a pošli, co ti vadilo.';
 
 // ---- Oznámení ----
 export const TOAST_SECONDS = 7; // jak dlouho je vidět oznámení o splněném úkolu
