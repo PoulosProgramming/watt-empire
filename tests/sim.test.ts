@@ -3,6 +3,7 @@ import { CREDITS_PER_MWH, INCINERATOR_START_VO, QUESTS, TOXIC_CRISIS_MWH, UPGRAD
 import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../src/sim/economy';
 import { TICK_DT, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
+import { cityDemandRangeMW } from '../src/sim/power';
 import { newGame } from '../src/sim/state';
 
 const run = (s: ReturnType<typeof newGame>, seconds: number) => {
@@ -26,7 +27,7 @@ describe('ekonomika', () => {
   it('nákup vylepšení stojí správně', () => {
     const s = newGame();
     s.credits = 1000;
-    s.taps = 200; // odemkne brigádníky
+    s.upgrades.power = 2; // odemkne brigádníky
     expect(buyUpgrade(s, 'worker')).toBe(true);
     expect(s.credits).toBe(1000 - upgradeCost('worker', 0));
     expect(s.upgrades.worker).toBe(1);
@@ -203,25 +204,53 @@ describe('ukládání', () => {
 });
 
 describe('odemykání', () => {
-  it('brigádníci jsou zamčení do 200 tapů a nejdou koupit', () => {
+  it('brigádníci jsou zamčení do 2 upgradů výkonu a nejdou koupit', () => {
     const s = newGame();
     s.credits = 5000;
-    s.taps = 199;
+    s.upgrades.power = 1;
     expect(isUnlocked(s, 'worker')).toBe(false);
     expect(buyUpgrade(s, 'worker')).toBe(false);
     expect(s.credits).toBe(5000);
-    s.taps = 200;
+    s.upgrades.power = 2;
     expect(isUnlocked(s, 'worker')).toBe(true);
     expect(buyUpgrade(s, 'worker')).toBe(true);
   });
 
-  it('mařič se odemkne až po výkonu spalovny 2, regulátor po 250 MWh', () => {
+  it('mařič se odemkne až po výkonu spalovny 4, regulátor po 250 MWh', () => {
     const s = newGame();
     expect(isUnlocked(s, 'dump')).toBe(false);
-    s.upgrades.power = 2;
+    s.upgrades.power = 3;
+    expect(isUnlocked(s, 'dump')).toBe(false);
+    s.upgrades.power = 4;
     expect(isUnlocked(s, 'dump')).toBe(true);
+    expect(isUnlocked(s, 'battery')).toBe(true);
     expect(isUnlocked(s, 'regulator')).toBe(false);
     s.delivered = 250;
     expect(isUnlocked(s, 'regulator')).toBe(true);
+  });
+});
+
+describe('rozsah spotřeby města', () => {
+  it('na začátku je 7 až 14 MW a s prestiží roste', () => {
+    const s = newGame();
+    const r = cityDemandRangeMW(s);
+    expect(r.min).toBeCloseTo(7, 5);
+    expect(r.max).toBeCloseTo(14, 1);
+    s.delivered = 500; // prestiž 2
+    expect(cityDemandRangeMW(s).min).toBeCloseTo(7 * 1.25, 5);
+  });
+});
+
+describe('krize v rozpisu příjmů', () => {
+  it('ztráta z krize se počítá zvlášť a součet sedí', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id);
+    s.delivered = TOXIC_CRISIS_MWH;
+    s.vo = 100;
+    tick(s);
+    expect(s.toxic).toBe(true);
+    const full = s.live.incomePerSecond + s.live.crisisLossPerSecond;
+    expect(s.live.crisisLossPerSecond).toBeGreaterThan(0);
+    expect(s.live.incomePerSecond / full).toBeCloseTo(0.6, 5);
   });
 });

@@ -29,7 +29,7 @@ Idle tycoon o elektrické síti, webová hra (mobil na výšku + PC). Design je 
 ## Stav plánu (GDD sekce 8)
 - [x] 1. Příprava
 - [x] 2. Jádro v číslech (HTML tlačítka, bez mapy; debug panel ×10 a +kredity)
-  - Po prvním hraní na mobilu (2 kola): sklad spalovny s hysterezí, pevný start 3 MW a výkon nákupem, mařič, větší baterie, auto regulátor až na konci kapitoly, nápověda, 12 úkolů, krize po 250 MWh.
+  - Po prvním hraní na mobilu (2 kola): sklad spalovny s hysterezí, pevný start 3 MW a výkon nákupem, mařič, větší baterie, auto regulátor až na konci kapitoly, nápověda, úkoly postupně (viz QUESTS), krize po 350 MWh.
 - [ ] 3. Mapa a stavění … 7. Kapitola 3
 
 ## Poznatky z hraní (první testy na mobilu, 8. 11. 2026)
@@ -38,14 +38,16 @@ Zapisuj sem, co ukázalo hraní, ať další agent ví, proč je hra nastavená 
 - **Přebytek v noci řeší hráč nákupem:** mařič (odvede 2 MW za úroveň, stojí 4 kredity za MWh) a baterie (10 MWh/úroveň). Automatický regulátor je záměrně velmi drahý (12000) a patří na konec kapitoly 1, protože řeší vše naráz.
 - **Město limitovalo hráče** a dráty byly zbytečné. Základní spotřeba zvýšena na 14 MW (ve dne 8–14, v noci 7 MW). Vedení má teď základ 6 MW (+3 za úroveň).
 - **Brigádníci byli moc levní a rychlí;** účinnost spalovny nikdo nekupoval. Proto dražší brigádníci (základ 500, růst 1,45×, max 10: první si hráč koupí po ~5 min klikání), nižší těžba na brigádníka (0,3 VO/s) a odpad je úzké hrdlo při vyšším výkonu, takže účinnost má smysl.
-- **Kapitola 1 se dala dohrát za ~10 min.** Hranice jsme zvedli: krize po 250 MWh, konec kapitoly (prestiž 2) po 400 MWh, 12 úkolů. Bot s rozumnou strategií ji dohraje za ~23 min (člověk pomaleji).
+- **Kapitola 1 se dala dohrát za ~10 min.** Hranice jsme zvedli: krize po 350 MWh (hráč řekl, že původních 250 přišlo dřív, než si stihl postavit autonomii), konec kapitoly (prestiž 2) po 500 MWh. Bot s rozumnou strategií ji dohraje za ~24 min (člověk pomaleji). Brigádníci: základ 400, růst 1,3× (po dalším testu mírně zlevněni, byli už otravní).
 - **Houpání výroby 0↔6 MW** bylo jen na startu (málo VO). Řeší sklad s hysterezí: spalovna se rozjede při 15 VO a zhasne, když sklad nestačí.
-- **Ekologická krize chyběla.** Zatím jen v číslech: po 250 MWh se objeví upozornění a město platí 60 %. Vizuální toxický odpad (2×2 na mapě) přijde s mapou (krok 3/4), řešení v kapitole 2.
+- **Ekologická krize chyběla.** Zatím jen v číslech: po 350 MWh se objeví upozornění a město platí 60 %. Vizuální toxický odpad (2×2 na mapě) přijde s mapou (krok 3/4), řešení v kapitole 2.
 - **Tlačítko „Třídit odpad"** bylo moc velké a hráč ho po chvíli nepoužíval (na mapě se tříbí klepáním na odpad, krok 3). Zmenšeno.
 - **Ladění:** ×10 rychlost je hodně používaná, protože pasivní fáze je nudná. Tlačítko +1000 kreditů ničí zkoušení tempa, ve finální verzi ho schovat.
 - **Baterie** dlouho nic nepřinášela (přebytek se prostě ztrácel). Zvětšena na 10 MWh/úroveň. Vyplatí se až při výkonu nad ~8 MW, kam hráč v kapitole 1 dojde pozdě. Zkontrolovat v dalším testu.
 - **Klikání vs. mapa:** teď hráč 100× klikne na tlačítko. Na mapě (krok 3) musí odpad najít a sebrat, což bude pomalejší. Až bude mapa, přeladit ceny brigádníků a sběr, aby 5 min ručního sběru zůstalo stejně dlouhých.
 - **Ztráta postupu po obnovení stránky** hráče naštvala, proto se ukládá už teď (předčasně před krokem 5). V ladění je tlačítko „Smazat postup".
-- **Postupné odemykání:** vylepšení mají podmínku `unlock` v `balance.ts` (např. brigádníci po 200 odklikaných VO) a úkoly se zobrazují po třech (`QUESTS_VISIBLE`). Pořadí úkolů musí odpovídat odemykání, aby žádný úkol nečekal na zamčené vylepšení bez důvodu.
+- **Postupné odemykání:** vylepšení mají podmínku `unlock` v `balance.ts` (např. brigádníci až po 2 upgradech výkonu spalovny, takže hráč první minuty jen klikne) a úkoly se zobrazují po třech (`QUESTS_VISIBLE`). Pořadí úkolů musí odpovídat odemykání, aby žádný úkol nečekal na zamčené vylepšení bez důvodu.
+- **Transparentní limity:** hráč vidí rozsah odběru města (noc až poledne, `cityDemandRangeMW`) a upgrade výkonu spalovny před koupí varuje, když by výkon přesáhl noční odběr, vedení nebo maximum města. Nové upgrady s nějakou pastí mají takhle varovat taky.
+- **Oznámení o splněném úkolu:** hráč dostal náhodně 2000 kreditů bez vysvětlení, proto se po splnění úkolu ukáže zelené oznámení s názvem a odměnou (klepnutím se zavře, `TOAST_SECONDS`). Každá další odměna nebo událost, která mění kredity, by měla být oznámená.
 - **Karta ⚡** ukazuje bilanci výkonu (výroba, baterie, mařič, ztráty, dodávka vs. co město chce), ne celkově dodané MWh (to je jen malá poznámka v rozpisu).
 - **Nevyřešeno:** čím se bude zvedat spotřeba města (budovy klikem, růst jen při online hraní, viz GDD sekce 9).

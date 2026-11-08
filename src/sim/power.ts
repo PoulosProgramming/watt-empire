@@ -41,6 +41,19 @@ export const batteryRateMW = (s: GameState) => s.upgrades.battery * BATTERY_RATE
 export const cityDemandMW = (s: GameState) =>
   baseDemandMW(s.hour) * (1 + (prestige(s) - 1) * DEMAND_PER_PRESTIGE);
 
+// Nejnižší a nejvyšší odběr města během dne (MW), aby hráč věděl, kolik energie město vůbec vezme.
+export function cityDemandRangeMW(s: GameState): { min: number; max: number } {
+  const mult = 1 + (prestige(s) - 1) * DEMAND_PER_PRESTIGE;
+  let min = Infinity;
+  let max = 0;
+  for (let h = 0; h < 24; h += 0.25) {
+    const d = baseDemandMW(h) * mult;
+    min = Math.min(min, d);
+    max = Math.max(max, d);
+  }
+  return { min, max };
+}
+
 // Jednoduchá síť: výroba -> (baterie) -> vedení -> město.
 // Přebytek, který nejde nikam uložit, přetěžuje síť.
 export function runPower(s: GameState, dt: number): void {
@@ -57,6 +70,7 @@ export function runPower(s: GameState, dt: number): void {
     live.wastedMW = 0;
     live.dumpedMW = 0;
     live.incomePerSecond = 0;
+    live.crisisLossPerSecond = 0;
     live.dumpCostPerSecond = 0;
     live.voBurnedPerSecond = 0;
     return;
@@ -147,5 +161,6 @@ export function runPower(s: GameState, dt: number): void {
   live.dumpCostPerSecond = (dumped / SECONDS_PER_GAME_HOUR) * DUMP_COST_PER_MWH;
   live.voBurnedPerSecond = voBurned;
   live.incomePerSecond = (toCity / SECONDS_PER_GAME_HOUR) * creditsPerMWh;
+  live.crisisLossPerSecond = (toCity / SECONDS_PER_GAME_HOUR) * (CREDITS_PER_MWH - creditsPerMWh);
 }
 

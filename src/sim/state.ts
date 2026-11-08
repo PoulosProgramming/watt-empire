@@ -26,6 +26,7 @@ export interface GameState {
     wastedMW: number;
     dumpedMW: number; // přebytek spálený mařičem
     incomePerSecond: number; // příjem z prodeje energie
+    crisisLossPerSecond: number; // o kolik krize snížila příjem z prodeje
     wagePerSecond: number; // mzdy brigádníků
     dumpCostPerSecond: number; // náklady na mařič
     voBurnedPerSecond: number; // VO spálené ve spalovně
@@ -59,6 +60,7 @@ export function newGame(): GameState {
       wastedMW: 0,
       dumpedMW: 0,
       incomePerSecond: 0,
+      crisisLossPerSecond: 0,
       wagePerSecond: 0,
       dumpCostPerSecond: 0,
       voBurnedPerSecond: 0,

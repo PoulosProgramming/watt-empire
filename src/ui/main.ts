@@ -3,6 +3,7 @@ import {
   AUTOSAVE_SECONDS,
   DEBUG_CREDITS_BONUS,
   DEBUG_SPEEDS,
+  INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
@@ -10,12 +11,13 @@ import {
   QUESTS_VISIBLE,
   STORY_CHAPTER_END,
   STORY_INTRO,
+  TOAST_SECONDS,
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
 import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../sim/economy';
 import { TICK_DT, tick } from '../sim/game';
-import { batteryCapacityMWh, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
+import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
 import { newGame } from '../sim/state';
@@ -91,6 +93,29 @@ document.querySelectorAll<HTMLElement>('.stat').forEach((el) =>
   }),
 );
 
+// Oznámení o splněném úkolu (po načtení hry se už splněné úkoly neoznamují)
+const seenQuests = new Set(state.doneQuests);
+const toasts = document.createElement('div');
+toasts.id = 'toasts';
+document.body.appendChild(toasts);
+function showToast(html: string): void {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = html;
+  const close = () => el.remove();
+  el.addEventListener('click', close);
+  setTimeout(close, TOAST_SECONDS * 1000);
+  toasts.appendChild(el);
+}
+function announceQuests(): void {
+  for (const q of QUESTS) {
+    if (state.doneQuests.includes(q.id) && !seenQuests.has(q.id)) {
+      seenQuests.add(q.id);
+      showToast(`✅ <b>Úkol splněn!</b><br>${q.text}<br><b>+${q.reward} 💰</b>`);
+    }
+  }
+}
+
 const $ = (id: string) => document.getElementById(id)!;
 
 $('tap').addEventListener('click', () => tap(state));
@@ -147,11 +172,12 @@ function render(): void {
   let detail = '';
   if (openStat === 'credits') {
     detail =
-      line('Prodej energie městu', `+${fmt(l.incomePerSecond, 2)}/s`, 'plus') +
+      line('Prodej energie městu (běžná cena)', `+${fmt(l.incomePerSecond + l.crisisLossPerSecond, 2)}/s`, 'plus') +
+      (s.toxic ? line('☣️ Ekologická krize (město platí jen ' + Math.round(TOXIC_INCOME_FACTOR * 100) + ' %)', `−${fmt(l.crisisLossPerSecond, 2)}/s`, 'minus') : '') +
       line('Mzdy brigádníků', `−${fmt(l.wagePerSecond, 2)}/s`, 'minus') +
       line('Mařič přebytku', `−${fmt(l.dumpCostPerSecond, 2)}/s`, 'minus') +
       line('Celkem', signed(net), 'total') +
-      (s.toxic ? `<small>☣️ Krize: město platí jen ${Math.round(TOXIC_INCOME_FACTOR * 100)} %.</small>` : '');
+      (s.toxic ? '<small>Krizi vyřeší až kapitola 2 (likvidátor odpadu).</small>' : '');
   } else if (openStat === 'energy') {
     const toBattery = Math.max(0, l.batteryFlowMW);
     const fromBattery = Math.max(0, -l.batteryFlowMW);
@@ -181,11 +207,13 @@ function render(): void {
   const mm = Math.floor((s.hour % 1) * 60).toString().padStart(2, '0');
   const dayNight = isDay(s.hour) ? '<span class="day">☀️ den</span>' : '<span class="night">🌙 noc</span>';
   const bcap = batteryCapacityMWh(s);
+  const range = cityDemandRangeMW(s);
   const overPct = Math.min(100, (s.overload / OVERLOAD_TOLERANCE_SECONDS) * 100);
   $('grid').innerHTML = `
     <div class="row"><span>Čas</span><b>Den ${s.day}, ${hh}:${mm} ${dayNight}</b></div>
     <div class="row"><span>Prestiž města</span><b>${prestige(s)}</b></div>
     <div class="row"><span>Spotřeba města</span><b>${fmt(l.demandMW)} MW</b></div>
+    <div class="row"><span>Rozsah spotřeby</span><b>${fmt(range.min)} (noc) – ${fmt(range.max)} MW (poledne)</b></div>
     <div class="row"><span>Výroba</span><b>${fmt(l.productionMW)} MW</b></div>
     <div class="row"><span>Dodáváme</span><b>${fmt(l.deliveredMW)} / ${lineCapacityMW(s)} MW (vedení)</b></div>
     <div class="row"><span>Baterie</span><b>${fmt(s.battery)} / ${bcap} MWh ${l.batteryFlowMW > 0.01 ? '⬆' : l.batteryFlowMW < -0.01 ? '⬇' : ''}</b></div>
@@ -220,7 +248,15 @@ function render(): void {
     const max = lvl >= def.maxLevel;
     const cost = upgradeCost(def.id, lvl);
     el.disabled = max || s.credits < cost;
-    el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${def.description}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
+    let desc = def.description;
+    if (def.id === 'power' && !max) {
+      const next = incineratorNominalMW(s) + INCINERATOR_POWER_STEP_MW;
+      if (next > range.max) desc = `⚠️ Po koupi ${next} MW, ale město vezme nejvýš ${fmt(range.max)} MW. Zbytek by se zbytečně pálil.`;
+      else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty.`;
+      else if (next > range.min) desc = `Po koupi ${next} MW. Město v noci bere jen ${fmt(range.min)} MW, přebytek ${fmt(next - range.min)} MW pak potřebuje mařič nebo baterii.`;
+      else desc = `Po koupi ${next} MW. Město ho vždy vezme (v noci aspoň ${fmt(range.min)} MW).`;
+    }
+    el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
 
   const chapterDone = QUESTS.every((q) => s.doneQuests.includes(q.id));
@@ -251,6 +287,7 @@ function frame(now: number): void {
     tick(state);
     acc -= TICK_DT;
   }
+  announceQuests();
   render();
   requestAnimationFrame(frame);
 }
