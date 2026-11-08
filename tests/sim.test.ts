@@ -153,8 +153,36 @@ describe('spalovna', () => {
     const s = newGame();
     s.delivered = TOXIC_CRISIS_MWH;
     s.vo = 100;
+    s.upgrades.worker = 5; // autonomie
+    s.credits = 100;
     tick(s);
     expect(s.toxic).toBe(true);
+  });
+
+  it('bez autonomie krize nezačne, ani když je dodáno dost MWh', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id);
+    s.delivered = TOXIC_CRISIS_MWH + 50;
+    s.vo = 100;
+    s.upgrades.worker = 1; // 0,4 VO/s, spalovna potřebuje 1 VO/s
+    s.credits = 100;
+    tick(s);
+    expect(s.live.autonomous).toBe(false);
+    expect(s.toxic).toBe(false);
+  });
+
+  it('autonomie: 5 brigádníků stačí na 6 MW, 4 ne', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id);
+    s.upgrades.power = 3; // 6 MW = 2 VO/s
+    s.credits = 1000;
+    s.vo = 1000;
+    s.upgrades.worker = 4;
+    tick(s);
+    expect(s.live.autonomous).toBe(false);
+    s.upgrades.worker = 5;
+    tick(s);
+    expect(s.live.autonomous).toBe(true);
   });
 
   it('automatický regulátor drží výkon podle spotřeby a blokuje ruční změnu', () => {
@@ -247,6 +275,8 @@ describe('krize v rozpisu příjmů', () => {
     s.doneQuests = QUESTS.map((q) => q.id);
     s.delivered = TOXIC_CRISIS_MWH;
     s.vo = 100;
+    s.upgrades.worker = 5; // autonomie
+    s.credits = 100;
     tick(s);
     expect(s.toxic).toBe(true);
     const full = s.live.incomePerSecond + s.live.crisisLossPerSecond;
