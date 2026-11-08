@@ -216,11 +216,14 @@ describe('odemykání', () => {
     expect(buyUpgrade(s, 'worker')).toBe(true);
   });
 
-  it('mařič se odemkne až po výkonu spalovny 2, regulátor po 250 MWh', () => {
+  it('mařič se odemkne až po výkonu spalovny 4, regulátor po 250 MWh', () => {
     const s = newGame();
     expect(isUnlocked(s, 'dump')).toBe(false);
-    s.upgrades.power = 2;
+    s.upgrades.power = 3;
+    expect(isUnlocked(s, 'dump')).toBe(false);
+    s.upgrades.power = 4;
     expect(isUnlocked(s, 'dump')).toBe(true);
+    expect(isUnlocked(s, 'battery')).toBe(true);
     expect(isUnlocked(s, 'regulator')).toBe(false);
     s.delivered = 250;
     expect(isUnlocked(s, 'regulator')).toBe(true);

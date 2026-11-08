@@ -78,8 +78,8 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz, ale v noci hrozí přebytek)', baseCost: 300, growth: 1.8, maxLevel: 7, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' } },
   { id: 'efficiency', name: 'Účinnost spalovny', description: 'Z méně VO více energie', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' } },
   { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
-  { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'upgrade', upgrade: 'power', target: 2, text: 'po výkonu spalovny 5 MW' } },
-  { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'delivered', target: 30, text: 'po dodání 30 MWh' } },
+  { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'upgrade', upgrade: 'power', target: 4, text: 'po výkonu spalovny 7 MW (od 8 MW vzniká noční přebytek)' } },
+  { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 4, text: 'po výkonu spalovny 7 MW (od 8 MW vzniká noční přebytek)' } },
   { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1, unlock: { kind: 'delivered', target: 250, text: 'po dodání 250 MWh (po ekologické krizi)' } },
 ];
 
@@ -99,6 +99,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'power2', text: 'Zvyš výkon spalovny na úroveň 2 (5 MW)', kind: 'upgrade', upgrade: 'power', target: 2, reward: 300 },
   { id: 'worker3', text: 'Najmi 3 brigádníky', kind: 'upgrade', upgrade: 'worker', target: 3, reward: 80 },
   { id: 'deliver30', text: 'Dodej městu 30 MWh', kind: 'delivered', target: 30, reward: 150 },
+  { id: 'power4', text: 'Zvyš výkon spalovny na úroveň 4 (7 MW, tolik město bere v noci)', kind: 'upgrade', upgrade: 'power', target: 4, reward: 350 },
   { id: 'dump1', text: 'Kup mařič přebytku (odvede přebytek v noci)', kind: 'upgrade', upgrade: 'dump', target: 1, reward: 400 },
   { id: 'battery1', text: 'Kup první baterii', kind: 'upgrade', upgrade: 'battery', target: 1, reward: 500 },
   { id: 'deliver100', text: 'Dodej městu 100 MWh', kind: 'delivered', target: 100, reward: 600 },
