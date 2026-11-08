@@ -17,6 +17,7 @@ import {
   STORY_CHAPTER_END,
   STORY_INTRO,
   TOAST_SECONDS,
+  TOXIC_CRISIS_QUESTS,
   VO_OVERFLOW_PRICE,
   UPGRADES,
 } from '../sim/balance';
@@ -320,6 +321,7 @@ function render(): void {
   const shown = open.slice(0, QUESTS_VISIBLE);
   $('quests').innerHTML =
     `<div class="row"><span>Splněno</span><b>${s.doneQuests.length} / ${QUESTS.length}</b></div>` +
+    (s.doneQuests.length < TOXIC_CRISIS_QUESTS ? `<small>Po ${TOXIC_CRISIS_QUESTS}. úkolu přijde ekologická krize.</small>` : '') +
     shown
       .map((q) => {
         const p = Math.min(q.target, questProgress(s, q));

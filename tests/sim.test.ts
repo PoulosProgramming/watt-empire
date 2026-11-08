@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
+import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_QUESTS, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
@@ -149,9 +149,11 @@ describe('spalovna', () => {
     expect(s.credits).toBeGreaterThanOrEqual(0);
   });
 
-  it('po 90 MWh začne ekologická krize a příjem klesne', () => {
+  const doneQuests = (n: number) => QUESTS.slice(0, n).map((q) => q.id);
+
+  it('po splnění 15. úkolu (a při autonomii) začne ekologická krize', () => {
     const s = newGame();
-    s.delivered = TOXIC_CRISIS_MWH;
+    s.doneQuests = doneQuests(TOXIC_CRISIS_QUESTS);
     s.vo = 100;
     s.upgrades.worker = 5; // autonomie
     s.credits = 100;
@@ -159,10 +161,21 @@ describe('spalovna', () => {
     expect(s.toxic).toBe(true);
   });
 
-  it('bez autonomie krize nezačne, ani když je dodáno dost MWh', () => {
+  it('před 15. úkolem krize nezačne, i když je hráč autonomní a dodal hodně MWh', () => {
     const s = newGame();
-    s.doneQuests = QUESTS.map((q) => q.id);
-    s.delivered = TOXIC_CRISIS_MWH + 50;
+    s.doneQuests = doneQuests(TOXIC_CRISIS_QUESTS - 1);
+    s.delivered = 1000;
+    s.vo = 100;
+    s.upgrades.worker = 5;
+    s.credits = 100;
+    tick(s);
+    expect(s.live.autonomous).toBe(true);
+    expect(s.toxic).toBe(false);
+  });
+
+  it('bez autonomie krize nezačne, ani když je splněno 15 úkolů', () => {
+    const s = newGame();
+    s.doneQuests = doneQuests(TOXIC_CRISIS_QUESTS);
     s.vo = 100;
     s.upgrades.worker = 1; // 0,4 VO/s, spalovna potřebuje 1 VO/s
     s.credits = 100;
@@ -273,7 +286,6 @@ describe('krize v rozpisu příjmů', () => {
   it('ztráta z krize se počítá zvlášť a součet sedí', () => {
     const s = newGame();
     s.doneQuests = QUESTS.map((q) => q.id);
-    s.delivered = TOXIC_CRISIS_MWH;
     s.vo = 100;
     s.upgrades.worker = 5; // autonomie
     s.credits = 100;

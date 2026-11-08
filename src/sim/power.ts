@@ -15,7 +15,7 @@ import {
   OVERLOAD_TOLERANCE_SECONDS,
   PRESTIGE_THRESHOLDS_MWH,
   SECONDS_PER_GAME_HOUR,
-  TOXIC_CRISIS_MWH,
+  TOXIC_CRISIS_QUESTS,
   TOXIC_INCOME_FACTOR,
 } from './balance';
 import { baseDemandMW } from './daynight';
@@ -132,8 +132,8 @@ export function runPower(s: GameState, dt: number): void {
   // 3) Dodaná energie = peníze
   const mwh = toCity * dtH;
   s.delivered += mwh;
-  // Krize začne až ve chvíli, kdy je hráč autonomní (nemusí klikat a má z čeho žít)
-  if (s.delivered >= TOXIC_CRISIS_MWH && live.autonomous) s.toxic = true;
+  // Krize začne po splnění 15. úkolu a až ve chvíli, kdy je hráč autonomní (nemusí klikat a má z čeho žít)
+  if (s.doneQuests.length >= TOXIC_CRISIS_QUESTS && live.autonomous) s.toxic = true;
   const creditsPerMWh = CREDITS_PER_MWH * (s.toxic ? TOXIC_INCOME_FACTOR : 1);
   s.credits += mwh * creditsPerMWh;
 

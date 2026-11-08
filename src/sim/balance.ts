@@ -49,7 +49,7 @@ export const BLACKOUT_SECONDS = 15;
 export const BLACKOUT_FEE = 60; // poplatek za nahození (nikdy nejde do mínusu)
 
 // ---- Ekologická krize (kapitola 1) ----
-export const TOXIC_CRISIS_MWH = 350; // po tolika dodaných MWh A zároveň při autonomii vyplivne spalovna toxický odpad
+export const TOXIC_CRISIS_QUESTS = 15; // po splnění tolika úkolů (a při autonomii) vyplivne spalovna toxický odpad
 export const TOXIC_INCOME_FACTOR = 0.6; // během krize město platí jen 60 % (řeší se až v kapitole 2)
 
 // ---- Prestiž ----
@@ -112,7 +112,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'battery1', text: 'Kup první baterii', kind: 'upgrade', upgrade: 'battery', target: 1, reward: 500 },
   { id: 'deliver100', text: 'Dodej městu 100 MWh', kind: 'delivered', target: 100, reward: 600 },
   { id: 'line2', text: 'Posil dráty a trafo na úroveň 2 (12 MW)', kind: 'upgrade', upgrade: 'line', target: 2, reward: 800 },
-  { id: 'deliver250', text: 'Přežij ekologickou krizi: dodej městu 350 MWh (krize začne, až budeš autonomní)', kind: 'delivered', target: 350, reward: 1000 },
+  { id: 'deliver250', text: 'Dodej městu 350 MWh (po tomto úkolu přijde ekologická krize)', kind: 'delivered', target: 350, reward: 1000 },
   { id: 'regulator', text: 'Kup automatický regulátor', kind: 'upgrade', upgrade: 'regulator', target: 1, reward: 1500 },
   { id: 'deliver400', text: 'Dodej městu 500 MWh (konec kapitoly 1)', kind: 'delivered', target: 500, reward: 2000 },
 ];
