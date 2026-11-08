@@ -86,9 +86,9 @@ export interface UpgradeDef {
   group?: 'incinerator'; // vylepšení spalovny se v UI zobrazí přímo pod kartou Spalovna
 }
 
-// Brigádníci: v kapitole 1 stačí 6 (2,4 VO/s = plný výkon 10 MW při účinnosti spalovny aspoň 4). Víc je pro pozdější kapitoly.
+// Brigádníci: bez pevného limitu (hráč chtěl "tolik, kolik můžeme"), omezuje je jen cena (každý další +30 %) a mzda.
 export const UPGRADES: UpgradeDef[] = [
-  { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 175, growth: 1.3, maxLevel: 6, unlock: { kind: 'upgrade', upgrade: 'power', target: 1, text: 'po prvním upgradu výkonu spalovny' } },
+  { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 175, growth: 1.3, maxLevel: Infinity, unlock: { kind: 'upgrade', upgrade: 'power', target: 1, text: 'po prvním upgradu výkonu spalovny' } },
   { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz za dodanou energii)', baseCost: 300, growth: 1.28, maxLevel: 12, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' }, group: 'incinerator' },
   { id: 'efficiency', name: 'Účinnost spalovny', description: 'Stejný výkon za méně VO (−10 % spotřeby odpadu)', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' }, group: 'incinerator' },
   { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
@@ -136,7 +136,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'deliver400', text: 'Dodej městu 500 MWh (konec kapitoly 1)', kind: 'delivered', target: 500, reward: 2000 },
   // --- Průběžné úkoly (nepovinné, ukážou se po autonomii) ---
   { id: 'o_eff4', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 4 (plný výkon 10 MW na 6 brigádníků)', kind: 'upgrade', upgrade: 'efficiency', target: 4, reward: 2500 },
-  { id: 'o_worker6', ongoing: true, text: 'Najmi 6 brigádníků (maximum)', kind: 'upgrade', upgrade: 'worker', target: 6, reward: 600 },
+  { id: 'o_worker6', ongoing: true, text: 'Najmi 6 brigádníků', kind: 'upgrade', upgrade: 'worker', target: 6, reward: 600 },
   { id: 'o_eff5', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 5', kind: 'upgrade', upgrade: 'efficiency', target: 5, reward: 3500 },
   { id: 'o_deliver1000', ongoing: true, text: 'Dodej městu 1000 MWh', kind: 'delivered', target: 1000, reward: 3000 },
   { id: 'o_eff7', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 7', kind: 'upgrade', upgrade: 'efficiency', target: 7, reward: 6000 },

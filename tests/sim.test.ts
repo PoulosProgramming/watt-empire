@@ -461,13 +461,18 @@ describe('průběžné úkoly', () => {
   });
 });
 
-describe('brigádníci v kapitole 1', () => {
-  it('maximum je 6 a víc koupit nejde', () => {
+describe('brigádníci', () => {
+  it('počet brigádníků není omezený, omezuje ho jen cena', () => {
     const s = newGame();
     s.upgrades.power = 1;
     s.credits = 1e9;
-    for (let i = 0; i < 20; i++) buyUpgrade(s, 'worker');
-    expect(s.upgrades.worker).toBe(6);
+    for (let i = 0; i < 12; i++) buyUpgrade(s, 'worker');
+    expect(s.upgrades.worker).toBe(12);
+    // každý další je dražší
+    expect(upgradeCost('worker', 12)).toBeGreaterThan(upgradeCost('worker', 11));
+    // bez peněz už nejde koupit
+    s.credits = 0;
+    expect(buyUpgrade(s, 'worker')).toBe(false);
   });
 
   it('6 brigádníků zvládne plných 10 MW, když je účinnost aspoň 4', () => {
