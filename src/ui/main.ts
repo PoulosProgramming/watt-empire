@@ -67,9 +67,6 @@ app.innerHTML = `
   </details>
   <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
 
-  <h2>Síť</h2>
-  <div class="card" id="grid"></div>
-
   <h2>Spalovna</h2>
   <div class="card">
     <div class="row"><span>Stav</span><b id="incstate"></b></div>
@@ -85,6 +82,11 @@ app.innerHTML = `
 
   <h2>Úkoly</h2>
   <div class="card" id="quests"></div>
+
+  <details class="card netdetail">
+    <summary>🔌 Síť (podrobnosti)</summary>
+    <div id="grid"></div>
+  </details>
 
   <h2>Ladění</h2>
   <div class="card debug" id="debug"></div>
