@@ -38,7 +38,7 @@ Hra má tři kapitoly; každou odemyká dodaná energie a s ní prestiž města.
 - **Mapa:** mřížka cca 20×20, viditelná jen malá část, odpadky na zemi. Uprostřed spalovna (2×2), dráty vedou do trafa města v pravém dolním rohu.
 - **Ekonomika:** 5 tapů na odpad = 5 vytříděného odpadu (VO). 5 VO ve spalovně = 1 MWh (výkonem 10 MW). 1 MWh dodaná městu = 10 kreditů.
 - **Vylepšení:** brigádníci (automatický sběr), účinnost spalovny, kapacita drátů a trafa, první baterie (nutné pro noc).
-- **Krize:** v kapitole 2 (ne v kapitole 1) vyplivne spalovna toxický odpad (2×2), příjmy města klesnou. To motivuje k postupu do kapitoly 2.
+- **Krize:** na konci kapitoly 1 se ve zprávě naznačí hrozba; samotná krize (spalovna vyplivne toxický odpad 2×2, příjmy města klesnou) přijde na začátku kapitoly 2.
 - **Úkoly místo tutoriálu:** dodej 1 MWh, vyčisti 5 políček, dodej 100 MWh.
 
 ### Kapitola 2: Laboratoř, merge a soláry
