@@ -147,4 +147,5 @@ Nejdřív ověřit, že je jádro zábavné bez grafiky, a teprve pak stavět ma
 Z prvního hraní na mobilu (kroky 4 a dál):
 - **Rostoucí spotřeba města:** budovy staví hráč kliknutím (krok 4). Navíc může spotřeba pomalu růst s úrovní, ale jen při aktivním hraní, ne offline.
 - **Toxická krize** je zatím jen v číslech (po 250 MWh, příjem 60 %); vizuální toxický odpad a úkoly od postav přijdou v kroku 4; brigádníci tam budou omezeni množstvím odpadu na ostrově.
+- **Sběr na mapě** má být omezený (odpad se objevuje s limitem), aby nešlo hru dohrát rychlým klikáním; ceny brigádníků pak přeladit.
 - **Tutoriál s postavami** místo textové nápovědy.
