@@ -80,7 +80,7 @@ export interface UpgradeDef {
 export const UPGRADES: UpgradeDef[] = [
   { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 175, growth: 1.3, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 1, text: 'po prvním upgradu výkonu spalovny' } },
   { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz, ale v noci hrozí přebytek)', baseCost: 300, growth: 1.8, maxLevel: 7, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' }, group: 'incinerator' },
-  { id: 'efficiency', name: 'Účinnost spalovny', description: 'Z méně VO více energie', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' }, group: 'incinerator' },
+  { id: 'efficiency', name: 'Účinnost spalovny', description: 'Stejný výkon za méně VO (−10 % spotřeby odpadu)', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' }, group: 'incinerator' },
   { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
   { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'upgrade', upgrade: 'power', target: 4, text: 'po výkonu spalovny 7 MW (od 8 MW vzniká noční přebytek)' } },
   { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 4, text: 'po výkonu spalovny 7 MW (od 8 MW vzniká noční přebytek)' } },

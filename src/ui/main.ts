@@ -3,6 +3,9 @@ import {
   AUTOSAVE_SECONDS,
   DEBUG_CREDITS_BONUS,
   DEBUG_SPEEDS,
+  EFFICIENCY_VO_FACTOR,
+  INCINERATOR_VO_PER_MWH,
+  SECONDS_PER_GAME_HOUR,
   INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
   TOXIC_INCOME_FACTOR,
@@ -16,7 +19,7 @@ import {
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
-import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voStorageMax } from '../sim/economy';
+import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voPerMWh, voStorageMax } from '../sim/economy';
 import { TICK_DT, tick } from '../sim/game';
 import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
@@ -271,6 +274,10 @@ function render(): void {
       else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty.`;
       else if (next > range.min) desc = `Po koupi ${next} MW. Město v noci bere jen ${fmt(range.min)} MW, přebytek ${fmt(next - range.min)} MW pak potřebuje mařič nebo baterii.`;
       else desc = `Po koupi ${next} MW. Město ho vždy vezme (v noci aspoň ${fmt(range.min)} MW).`;
+    }
+    if (def.id === 'efficiency' && !max) {
+      const now = (incineratorNominalMW(s) * s.incineratorLevel / SECONDS_PER_GAME_HOUR) * voPerMWh(s, INCINERATOR_VO_PER_MWH);
+      desc = `Stejný výkon za méně VO: spalovna spálí ${fmt(now, 2)} VO/s, po koupi ${fmt(now * EFFICIENCY_VO_FACTOR, 2)} VO/s.`;
     }
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
