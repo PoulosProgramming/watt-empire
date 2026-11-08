@@ -20,7 +20,7 @@ import {
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
 import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voPerMWh, voStorageMax } from '../sim/economy';
-import { TICK_DT, tick } from '../sim/game';
+import { TICK_DT, simulateOffline, tick } from '../sim/game';
 import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
@@ -38,6 +38,7 @@ let resetting = false; // při mazání postupu se nesmí uložit zpátky (uklá
 function saveNow(): void {
   if (resetting) return;
   try {
+    state.lastSeen = Date.now();
     localStorage.setItem(SAVE_KEY, serialize(state));
   } catch {
     /* nejde uložit, hra běží dál */
@@ -45,9 +46,16 @@ function saveNow(): void {
 }
 const state = loadSaved() ?? newGame();
 clampVO(state); // starší uložení mohlo mít víc VO, než se vejde do skladu
-setInterval(saveNow, AUTOSAVE_SECONDS * 1000);
+setInterval(() => {
+  if (document.visibilityState === 'visible') saveNow(); // v pozadí by to přepsalo čas schování
+}, AUTOSAVE_SECONDS * 1000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') saveNow();
+  if (document.visibilityState === 'hidden') {
+    saveNow(); // uloží i čas schování pro idle dopočet
+  } else {
+    runOffline(); // telefon byl zamčený nebo stránka v pozadí
+    last = performance.now();
+  }
 });
 window.addEventListener('pagehide', saveNow);
 let speed = 1;
@@ -127,6 +135,23 @@ function announceQuests(): void {
     }
   }
 }
+
+// Idle: dopočet času, kdy hra neběžela (zamčený telefon, zavřená stránka)
+function runOffline(): void {
+  if (!state.lastSeen) return;
+  const elapsed = (Date.now() - state.lastSeen) / 1000;
+  state.lastSeen = Date.now();
+  const r = simulateOffline(state, elapsed);
+  if (!r) return;
+  const min = Math.max(1, Math.round(r.seconds / 60));
+  const vo = r.vo >= 0 ? `+${fmt(r.vo, 0)}` : `−${fmt(Math.abs(r.vo), 0)}`;
+  showToast(
+    `🌙 <b>Zatímco jsi byl pryč (${min} min)</b><br>` +
+      `💰 ${r.credits >= 0 ? '+' : '−'}${fmt(Math.abs(r.credits), 0)}, ⚡ ${fmt(r.delivered)} MWh dodáno, ♻️ ${vo} VO` +
+      (r.blackouts > 0 ? `<br>⚫ ${r.blackouts}× vypadla síť` : ''),
+  );
+}
+runOffline(); // po načtení hry dopočítat čas, kdy hráč nehrál
 
 const $ = (id: string) => document.getElementById(id)!;
 
