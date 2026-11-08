@@ -15,6 +15,7 @@ export interface GameState {
   battery: number; // uloženo (MWh)
   overload: number; // sekundy přetížení
   blackout: number; // zbývající sekundy výpadku
+  lastSeen: number; // čas (ms) posledního uložení nebo schování hry, pro idle dopočet
   toxic: boolean; // ekologická krize začala (toxický odpad)
   doneQuests: string[];
   // hodnoty z posledního tiku (jen pro zobrazení)
@@ -54,6 +55,7 @@ export function newGame(): GameState {
     battery: 0,
     overload: 0,
     blackout: 0,
+    lastSeen: 0,
     toxic: false,
     doneQuests: [],
     live: {

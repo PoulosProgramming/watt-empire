@@ -3,6 +3,9 @@ import {
   AUTOSAVE_SECONDS,
   DEBUG_CREDITS_BONUS,
   DEBUG_SPEEDS,
+  EFFICIENCY_VO_FACTOR,
+  INCINERATOR_VO_PER_MWH,
+  SECONDS_PER_GAME_HOUR,
   INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
   TOXIC_INCOME_FACTOR,
@@ -16,8 +19,8 @@ import {
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
-import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voStorageMax } from '../sim/economy';
-import { TICK_DT, tick } from '../sim/game';
+import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voPerMWh, voStorageMax } from '../sim/economy';
+import { TICK_DT, simulateOffline, tick } from '../sim/game';
 import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
@@ -35,6 +38,7 @@ let resetting = false; // při mazání postupu se nesmí uložit zpátky (uklá
 function saveNow(): void {
   if (resetting) return;
   try {
+    state.lastSeen = Date.now();
     localStorage.setItem(SAVE_KEY, serialize(state));
   } catch {
     /* nejde uložit, hra běží dál */
@@ -42,9 +46,16 @@ function saveNow(): void {
 }
 const state = loadSaved() ?? newGame();
 clampVO(state); // starší uložení mohlo mít víc VO, než se vejde do skladu
-setInterval(saveNow, AUTOSAVE_SECONDS * 1000);
+setInterval(() => {
+  if (document.visibilityState === 'visible') saveNow(); // v pozadí by to přepsalo čas schování
+}, AUTOSAVE_SECONDS * 1000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') saveNow();
+  if (document.visibilityState === 'hidden') {
+    saveNow(); // uloží i čas schování pro idle dopočet
+  } else {
+    runOffline(); // telefon byl zamčený nebo stránka v pozadí
+    last = performance.now();
+  }
 });
 window.addEventListener('pagehide', saveNow);
 let speed = 1;
@@ -73,6 +84,7 @@ app.innerHTML = `
   <div class="card">
     <div class="row"><span>Stav</span><b id="incstate"></b></div>
     <div class="row"><span>Sklad VO</span><b id="incstock"></b></div>
+    <div class="row"><span>Cena VO navíc (nad sklad)</span><b>${VO_OVERFLOW_PRICE} 💰 / VO</b></div>
     <div class="row"><span>Výkon</span><b id="inclevel"></b></div>
     <button id="toggle" style="width:100%;margin-top:6px"></button>
   </div>
@@ -124,6 +136,23 @@ function announceQuests(): void {
   }
 }
 
+// Idle: dopočet času, kdy hra neběžela (zamčený telefon, zavřená stránka)
+function runOffline(): void {
+  if (!state.lastSeen) return;
+  const elapsed = (Date.now() - state.lastSeen) / 1000;
+  state.lastSeen = Date.now();
+  const r = simulateOffline(state, elapsed);
+  if (!r) return;
+  const min = Math.max(1, Math.round(r.seconds / 60));
+  const vo = r.vo >= 0 ? `+${fmt(r.vo, 0)}` : `−${fmt(Math.abs(r.vo), 0)}`;
+  showToast(
+    `🌙 <b>Zatímco jsi byl pryč (${min} min)</b><br>` +
+      `💰 ${r.credits >= 0 ? '+' : '−'}${fmt(Math.abs(r.credits), 0)}, ⚡ ${fmt(r.delivered)} MWh dodáno, ♻️ ${vo} VO` +
+      (r.blackouts > 0 ? `<br>⚫ ${r.blackouts}× vypadla síť` : ''),
+  );
+}
+runOffline(); // po načtení hry dopočítat čas, kdy hráč nehrál
+
 const $ = (id: string) => document.getElementById(id)!;
 
 $('tap').addEventListener('click', () => tap(state));
@@ -173,7 +202,6 @@ function render(): void {
   $('energy').textContent = `⚡ ${fmt(l.productionMW)} MW`;
   $('power').textContent = `chce ${fmt(l.demandMW)} MW`;
   $('vo').textContent = `♻️ ${fmt(s.vo, 0)} VO`;
-  $('tap').textContent = s.vo >= voStorageMax(s) - 1e-9 ? `♻️ Sklad plný: VO se prodá za ${VO_OVERFLOW_PRICE} 💰` : '♻️ Třídit odpad (+1 VO)';
   $('vops').textContent = `+${fmt(l.voPerSecond)}/s`;
 
   const line = (name: string, value: string, cls = '') => `<div class="row ${cls}"><span>${name}</span><b>${value}</b></div>`;
@@ -212,7 +240,10 @@ function render(): void {
       line('Spalovna potřebuje', `${fmt(l.voNeedPerSecond, 2)}/s`) +
       line('Autonomie', l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : `✖ chybí ${fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2)} VO/s (najmi brigádníka, kup účinnost nebo klikej)`, l.autonomous ? 'plus' : 'minus') +
       line('Celkem (bez tapů)', signed(voNet), 'total') +
-      line('Sklad', `${fmt(s.vo, 0)} VO`);
+      line('Sklad', `${fmt(s.vo, 0)} / ${fmt(voStorageMax(s), 0)} VO`) +
+      line('Cena VO navíc (nad sklad)', `${VO_OVERFLOW_PRICE} 💰 / VO`) +
+      line('Prodej přebytku teď', `+${fmt(l.overflowIncomePerSecond, 2)} 💰/s`, l.overflowIncomePerSecond > 0.01 ? 'plus' : '') +
+      `<small>Co se do skladu nevejde, se automaticky prodá.</small>`;
   }
   $('statdetail').innerHTML = detail ? `<div class="card detail">${detail}</div>` : '';
 
@@ -268,6 +299,10 @@ function render(): void {
       else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty.`;
       else if (next > range.min) desc = `Po koupi ${next} MW. Město v noci bere jen ${fmt(range.min)} MW, přebytek ${fmt(next - range.min)} MW pak potřebuje mařič nebo baterii.`;
       else desc = `Po koupi ${next} MW. Město ho vždy vezme (v noci aspoň ${fmt(range.min)} MW).`;
+    }
+    if (def.id === 'efficiency' && !max) {
+      const now = (incineratorNominalMW(s) * s.incineratorLevel / SECONDS_PER_GAME_HOUR) * voPerMWh(s, INCINERATOR_VO_PER_MWH);
+      desc = `Stejný výkon za méně VO: spalovna spálí ${fmt(now, 2)} VO/s, po koupi ${fmt(now * EFFICIENCY_VO_FACTOR, 2)} VO/s.`;
     }
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CREDITS_PER_MWH, INCINERATOR_START_VO, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
+import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
-import { TICK_DT, tick } from '../src/sim/game';
+import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
 import { newGame } from '../src/sim/state';
@@ -310,5 +310,55 @@ describe('sklad VO', () => {
     expect(s.vo).toBeCloseTo(voStorageMax(s), 5);
     expect(s.credits).toBeCloseTo(VO_OVERFLOW_PRICE, 5);
     expect(s.taps).toBe(1);
+  });
+});
+
+describe('idle (offline dopočet)', () => {
+  const autonomous = () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id); // ať úkoly nevyplatí kredity
+    s.upgrades.power = 1; // 4 MW
+    s.upgrades.worker = 4; // autonomie
+    s.credits = 100;
+    s.vo = 60;
+    return s;
+  };
+
+  it('autonomní hráč si za idle vydělá a dodá energii', () => {
+    const s = autonomous();
+    const r = simulateOffline(s, 600)!;
+    expect(r.seconds).toBe(600);
+    expect(r.credits).toBeGreaterThan(100);
+    expect(r.delivered).toBeGreaterThan(5);
+    expect(s.credits).toBeGreaterThanOrEqual(0);
+  });
+
+  it('krátká pauza se nepočítá', () => {
+    const s = autonomous();
+    expect(simulateOffline(s, 5)).toBeNull();
+    expect(s.credits).toBe(100);
+  });
+
+  it('dopočet je omezený horním limitem', () => {
+    const s = autonomous();
+    const r = simulateOffline(s, 10 * OFFLINE_MAX_SECONDS)!;
+    expect(r.seconds).toBe(OFFLINE_MAX_SECONDS);
+  });
+
+  it('bez brigádníků dojde odpad a výroba se zastaví', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id);
+    s.vo = 60;
+    const r = simulateOffline(s, 1200)!;
+    expect(s.vo).toBeLessThan(15); // sklad se vyčerpal
+    expect(r.delivered).toBeGreaterThan(0);
+    expect(r.delivered).toBeLessThan(60 / 5 + 1); // nejvýš z 60 VO
+    expect(s.credits).toBeGreaterThanOrEqual(0);
+  });
+
+  it('uložení zachová čas posledního uložení', () => {
+    const s = newGame();
+    s.lastSeen = 123456;
+    expect(deserialize(serialize(s))!.lastSeen).toBe(123456);
   });
 });

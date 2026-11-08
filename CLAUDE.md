@@ -5,7 +5,7 @@ Idle tycoon o elektrické síti, webová hra (mobil na výšku + PC). Design je 
 ## Stack
 - TypeScript + Vite (build, dev server), Vitest (testy).
 - Phaser 3 až od kroku 3 plánu (mapa). UI jsou HTML/CSS prvky nad herní plochou.
-- Uložení: localStorage (automaticky jednou za minutu (`AUTOSAVE_SECONDS`) a při zavření stránky, `src/sim/save.ts` + UI) je hotové; export/import textu a offline progres zbývají na krok 5. Žádný server. Při změně `GameState` zvaž zvýšení `SAVE_VERSION` (chybějící pole se doplní výchozími hodnotami).
+- Uložení: localStorage (automaticky jednou za minutu (`AUTOSAVE_SECONDS`) a při zavření stránky, `src/sim/save.ts` + UI) je hotové; export/import textu zbývá na krok 5 (jednoduchý idle je hotový, viz níže). Žádný server. Při změně `GameState` zvaž zvýšení `SAVE_VERSION` (chybějící pole se doplní výchozími hodnotami).
 
 ## Architektura (nejdůležitější pravidla)
 1. **Simulace je oddělená od grafiky.** Složka `src/sim/` je čistý TypeScript – žádný Phaser, žádné `document`/`window`. Grafika a UI (`src/ui/`) jen čtou stav.
@@ -53,5 +53,7 @@ Zapisuj sem, co ukázalo hraní, ať další agent ví, proč je hra nastavená 
 - **Upgrady spalovny pod kartou Spalovna:** vylepšení s `group: 'incinerator'` v `balance.ts` (výkon, účinnost, regulátor) se v UI zobrazují přímo pod kartou Spalovna, ostatní v sekci Vylepšení.
 - **Síť dole jako rozpad:** karta „Síť“ (čas, prestiž, spotřeba, rozsah, výroba, baterie, mařič, přetížení) je sbalená dole nad Laděním. Nahoře jsou jen karty 💰 ⚡ ♻️ a upozornění.
 - **Peníze brzdí výkon, ne odpad:** hráč měl odpadu kupu a peněz málo, protože peníze jdou jen za prodanou elektřinu (MW). Proto má sklad VO strop (`VO_STORAGE_SECONDS` = 60 s provozu při plném výkonu, roste s výkonem) a přebytek se automaticky prodá (`VO_OVERFLOW_PRICE` = 0,3 kreditu za VO, řádek v rozpisu 💰). Klikání tak dává smysl pořád, ale nejde si naklikat nekonečnou zásobu. Měřeno botem: autonomie za 5–8 min podle rychlosti klikání (hráč: autonomie za ~9 min hry, 1032 tapů).
+- **Účinnost spalovny byla zavádějící** (popis „více energie“, přitom se výkon v MW nemění). Správně: stejný výkon za méně VO. Popis to říká a před koupi UI ukáže konkrétní VO/s teď a po koupi.
+- **Jednoduchý idle:** hra se při zamčení telefonu zastaví, proto se při návratu (načtení stránky i `visibilitychange`) dopočítá čas pryč (`simulateOffline` v `game.ts`, krok `OFFLINE_STEP_SECONDS`, strop `OFFLINE_MAX_SECONDS` = 30 min, minimum 15 s). Platí stejná pravidla jako při hraní, jen bez klikání: bez autonomie dojde odpad a výroba se zastaví, s autonomií se vydělává. Uložení má `lastSeen` (čas posledního uložení nebo schování). Autosave neběží, když je stránka skrytá (přepsal by čas schování). Souhrn „Zatímco jsi byl pryč“ je oznámení. Zbývá: pořádný offline progres s ladicími čísly (nyní 100 % rychlosti) a export/import (krok 5).
 - **Karta ⚡** ukazuje bilanci výkonu (výroba, baterie, mařič, ztráty, dodávka vs. co město chce), ne celkově dodané MWh (to je jen malá poznámka v rozpisu).
 - **Nevyřešeno:** čím se bude zvedat spotřeba města (budovy klikem, růst jen při online hraní, viz GDD sekce 9).
