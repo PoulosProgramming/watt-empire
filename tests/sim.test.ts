@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
+import { CHAPTER1_END_QUESTS, CONTRACT_MW, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
+import { runCrisis } from '../src/sim/quests';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
 import { newGame } from '../src/sim/state';
@@ -149,26 +150,45 @@ describe('spalovna', () => {
     expect(s.credits).toBeGreaterThanOrEqual(0);
   });
 
-  it('po 90 MWh začne ekologická krize a příjem klesne', () => {
-    const s = newGame();
-    s.delivered = TOXIC_CRISIS_MWH;
-    s.vo = 100;
-    s.upgrades.worker = 5; // autonomie
-    s.credits = 100;
-    tick(s);
-    expect(s.toxic).toBe(true);
-  });
+  // Mechanismus krize je nachystaný pro kapitolu 2 (spouštěcí úkol je teď null), testuje se se zadaným úkolem
+  const TRIGGER = 'line2';
 
-  it('bez autonomie krize nezačne, ani když je dodáno dost MWh', () => {
+  it('v kapitole 1 se krize nespouští (spouštěcí úkol je null)', () => {
+    expect(TOXIC_TRIGGER_QUEST).toBeNull();
     const s = newGame();
     s.doneQuests = QUESTS.map((q) => q.id);
-    s.delivered = TOXIC_CRISIS_MWH + 50;
     s.vo = 100;
-    s.upgrades.worker = 1; // 0,4 VO/s, spalovna potřebuje 1 VO/s
-    s.credits = 100;
-    tick(s);
-    expect(s.live.autonomous).toBe(false);
+    s.delivered = 1000;
+    run(s, 60);
     expect(s.toxic).toBe(false);
+    expect(s.toxicCountdown).toBe(-1);
+  });
+
+  it('po splnění spouštěcího úkolu začne odpočet a krize se spustí sama za 15 s', () => {
+    const s = newGame();
+    s.doneQuests = [TRIGGER];
+    runCrisis(s, TICK_DT, TRIGGER);
+    expect(s.toxic).toBe(false);
+    expect(s.toxicCountdown).toBeGreaterThan(0);
+    for (let t = 0; t < TOXIC_DELAY_SECONDS - 1; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
+    expect(s.toxic).toBe(false);
+    for (let t = 0; t < 2; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
+    expect(s.toxic).toBe(true);
+    expect(s.toxicCountdown).toBe(-1);
+  });
+
+  it('bez spouštěcího úkolu krize nezačne ani se zadaným spouštěčem', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== TRIGGER);
+    for (let t = 0; t < 60; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
+    expect(s.toxic).toBe(false);
+  });
+
+  it('starší uložení s už spuštěnou krizí se při načtení vyčistí', () => {
+    const old = JSON.stringify({ v: 1, state: { credits: 5, toxic: true, toxicCountdown: 3 } });
+    const s = deserialize(old)!;
+    expect(s.toxic).toBe(false);
+    expect(s.toxicCountdown).toBe(-1);
   });
 
   it('autonomie: 5 brigádníků stačí na 6 MW, 4 ne', () => {
@@ -187,14 +207,13 @@ describe('spalovna', () => {
 
   it('automatický regulátor drží výkon podle spotřeby a blokuje ruční změnu', () => {
     const s = newGame();
-    s.hour = 20; // noc, spotřeba 7 MW
     s.upgrades.power = 7; // 10 MW
-    s.upgrades.line = 1; // vedení 9 MW
+    s.upgrades.line = 1; // vedení 9 MW, smlouva 15 MW => regulátor drží 9 MW = 90 % výkonu
     s.upgrades.regulator = 1;
     s.vo = 10000;
     s.credits = 100;
     run(s, 5);
-    expect(s.incineratorLevel).toBeCloseTo(0.7, 5);
+    expect(s.incineratorLevel).toBeCloseTo(0.9, 5);
     expect(s.blackout).toBe(0);
   });
 });
@@ -244,28 +263,76 @@ describe('odemykání', () => {
     expect(buyUpgrade(s, 'worker')).toBe(true);
   });
 
-  it('mařič se odemkne až po výkonu spalovny 4, regulátor po 250 MWh', () => {
+  it('mařič a baterie se odemknou až v kapitole 3, regulátor v kapitole 4', () => {
     const s = newGame();
+    s.upgrades.power = 12;
+    s.delivered = 5000;
     expect(isUnlocked(s, 'dump')).toBe(false);
-    s.upgrades.power = 3;
-    expect(isUnlocked(s, 'dump')).toBe(false);
-    s.upgrades.power = 4;
+    expect(isUnlocked(s, 'battery')).toBe(false);
+    expect(isUnlocked(s, 'regulator')).toBe(false);
+    s.chapter = 3;
     expect(isUnlocked(s, 'dump')).toBe(true);
     expect(isUnlocked(s, 'battery')).toBe(true);
     expect(isUnlocked(s, 'regulator')).toBe(false);
-    s.delivered = 250;
+    s.chapter = 4;
     expect(isUnlocked(s, 'regulator')).toBe(true);
   });
 });
 
-describe('rozsah spotřeby města', () => {
-  it('na začátku je 7 až 14 MW a s prestiží roste', () => {
+describe('smlouva na stálých 15 MW', () => {
+  it('odběr města je stálý, den i noc, a nezávisí na hodině', () => {
     const s = newGame();
     const r = cityDemandRangeMW(s);
-    expect(r.min).toBeCloseTo(7, 5);
-    expect(r.max).toBeCloseTo(14, 1);
+    expect(r.min).toBeCloseTo(CONTRACT_MW, 5);
+    expect(r.max).toBeCloseTo(CONTRACT_MW, 5);
+    for (const h of [3, 8, 12, 20]) {
+      s.hour = h;
+      tick(s);
+      expect(s.live.demandMW).toBeCloseTo(CONTRACT_MW, 5);
+    }
+  });
+
+  it('prestiž zvedá odběr až po konci kapitoly (500 MWh)', () => {
+    const s = newGame();
     s.delivered = 500; // prestiž 2
-    expect(cityDemandRangeMW(s).min).toBeCloseTo(7 * 1.25, 5);
+    expect(cityDemandRangeMW(s).max).toBeCloseTo(CONTRACT_MW * 1.25, 5);
+  });
+
+  it('smlouva se splní, když město aspoň jednou dostane 15 MW', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== 'contract');
+    s.upgrades.power = 12; // 15 MW
+    s.upgrades.line = 3; // vedení 15 MW
+    s.vo = 1000;
+    expect(s.contractMet).toBe(false);
+    tick(s);
+    expect(s.live.deliveredMW).toBeCloseTo(CONTRACT_MW, 5);
+    expect(s.contractMet).toBe(true);
+    expect(s.doneQuests).toContain('contract');
+  });
+
+  it('s vedením pro 12 MW se smlouva (15 MW) nesplní', () => {
+    const s = newGame();
+    s.upgrades.power = 12;
+    s.upgrades.line = 2; // 12 MW
+    s.vo = 1000;
+    tick(s);
+    expect(s.contractMet).toBe(false);
+  });
+
+  it('kapitola 1 končí smlouvou a 500 MWh, ne jen jedním z toho', () => {
+    expect(CHAPTER1_END_QUESTS).toEqual(['contract', 'deliver400']);
+    const contract = QUESTS.find((q) => q.id === 'contract')!;
+    const mwh = QUESTS.find((q) => q.id === 'deliver400')!;
+    expect(contract.kind).toBe('contract');
+    expect(mwh.target).toBe(500);
+  });
+
+  it('15 MW jde dosáhnout: výkon max 12 úrovní a vedení 3 úrovně stačí', () => {
+    const power = UPGRADES.find((u) => u.id === 'power')!;
+    const line = UPGRADES.find((u) => u.id === 'line')!;
+    expect(3 + power.maxLevel).toBeGreaterThanOrEqual(CONTRACT_MW);
+    expect(6 + 3 * line.maxLevel).toBeGreaterThanOrEqual(CONTRACT_MW);
   });
 });
 
@@ -273,12 +340,11 @@ describe('krize v rozpisu příjmů', () => {
   it('ztráta z krize se počítá zvlášť a součet sedí', () => {
     const s = newGame();
     s.doneQuests = QUESTS.map((q) => q.id);
-    s.delivered = TOXIC_CRISIS_MWH;
+    s.toxic = true;
     s.vo = 100;
-    s.upgrades.worker = 5; // autonomie
+    s.upgrades.worker = 5;
     s.credits = 100;
     tick(s);
-    expect(s.toxic).toBe(true);
     const full = s.live.incomePerSecond + s.live.crisisLossPerSecond;
     expect(s.live.crisisLossPerSecond).toBeGreaterThan(0);
     expect(s.live.incomePerSecond / full).toBeCloseTo(0.6, 5);
@@ -339,10 +405,24 @@ describe('idle (offline dopočet)', () => {
     expect(s.credits).toBe(100);
   });
 
-  it('dopočet je omezený horním limitem', () => {
+  it('dopočet je omezený horním limitem 24 hodin', () => {
     const s = autonomous();
     const r = simulateOffline(s, 10 * OFFLINE_MAX_SECONDS)!;
     expect(r.seconds).toBe(OFFLINE_MAX_SECONDS);
+  });
+
+  it('po prvních 30 minutách se počítá jen zlomek (hodina ≈ 1,05× půl hodiny)', () => {
+    const half = simulateOffline(autonomous(), 1800)!;
+    const hour = simulateOffline(autonomous(), 3600)!;
+    expect(half.playedSeconds).toBe(1800);
+    expect(hour.playedSeconds).toBeCloseTo(1800 + 1800 * OFFLINE_REDUCED_RATE, 5);
+    expect(hour.delivered / half.delivered).toBeLessThan(1.2);
+    expect(hour.delivered).toBeGreaterThan(half.delivered);
+  });
+
+  it('celý den (24 h) vyjde výrazně méně než 24 h plné hry', () => {
+    const day = simulateOffline(autonomous(), OFFLINE_MAX_SECONDS)!;
+    expect(day.playedSeconds).toBeLessThan(OFFLINE_MAX_SECONDS * 0.1);
   });
 
   it('bez brigádníků dojde odpad a výroba se zastaví', () => {
@@ -360,5 +440,71 @@ describe('idle (offline dopočet)', () => {
     const s = newGame();
     s.lastSeen = 123456;
     expect(deserialize(serialize(s))!.lastSeen).toBe(123456);
+  });
+});
+
+describe('průběžné úkoly', () => {
+  it('jsou v seznamu až za hlavními úkoly', () => {
+    const firstOngoing = QUESTS.findIndex((q) => q.ongoing);
+    expect(firstOngoing).toBeGreaterThan(QUESTS.findIndex((q) => q.id === 'line2'));
+    expect(QUESTS.slice(firstOngoing).every((q) => q.ongoing)).toBe(true);
+  });
+
+  it('průběžný úkol vyplatí odměnu, když je splněn', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.filter((q) => !q.ongoing).map((q) => q.id);
+    s.upgrades.efficiency = 4;
+    const before = s.credits;
+    tick(s);
+    expect(s.doneQuests).toContain('o_eff4');
+    expect(s.credits).toBeGreaterThan(before);
+  });
+});
+
+describe('brigádníci v kapitole 1', () => {
+  it('maximum je 6 a víc koupit nejde', () => {
+    const s = newGame();
+    s.upgrades.power = 1;
+    s.credits = 1e9;
+    for (let i = 0; i < 20; i++) buyUpgrade(s, 'worker');
+    expect(s.upgrades.worker).toBe(6);
+  });
+
+  it('6 brigádníků zvládne plných 10 MW, když je účinnost aspoň 4', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id);
+    s.upgrades.power = 7; // 10 MW
+    s.upgrades.worker = 6;
+    s.credits = 1000;
+    s.vo = 100;
+    s.upgrades.efficiency = 3;
+    tick(s);
+    expect(s.live.autonomous).toBe(false);
+    s.upgrades.efficiency = 4;
+    tick(s);
+    expect(s.live.autonomous).toBe(true);
+  });
+});
+
+describe('pořadí úkolů', () => {
+  it('line2 je 15. hlavní úkol a účinnost má v hlavním řetězci tři úkoly před ním', () => {
+    const main = QUESTS.filter((q) => !q.ongoing);
+    expect(main[14].id).toBe('line2');
+    const beforeTrigger = main.slice(0, 14).filter((q) => q.upgrade === 'efficiency').length;
+    expect(beforeTrigger).toBe(3);
+  });
+
+  it('mařič a baterie už nejsou v hlavním řetězci', () => {
+    const main = QUESTS.filter((q) => !q.ongoing);
+    expect(main.some((q) => q.upgrade === 'dump' || q.upgrade === 'battery')).toBe(false);
+  });
+
+  it('každý úkol na vylepšení má dosažitelnou úroveň', () => {
+    for (const q of QUESTS) {
+      if (q.kind === 'upgrade' && q.upgrade) {
+        const def = UPGRADES.find((u) => u.id === q.upgrade)!;
+        expect(q.target).toBeLessThanOrEqual(def.maxLevel);
+      }
+    }
   });
 });

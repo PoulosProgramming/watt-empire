@@ -1,3 +1,4 @@
+import { TOXIC_TRIGGER_QUEST } from './balance';
 import { newGame, type GameState } from './state';
 
 // Ukládání jako text (JSON). Čistý TypeScript: o samotné úložiště (localStorage) se stará UI.
@@ -16,13 +17,19 @@ export function deserialize(text: string | null): GameState | null {
     if (!data || typeof data !== 'object' || data.v !== SAVE_VERSION || typeof data.state !== 'object') return null;
     const base = newGame();
     const saved = data.state as Partial<GameState>;
-    return {
+    const loaded: GameState = {
       ...base,
       ...saved,
       upgrades: { ...base.upgrades, ...(saved.upgrades ?? {}) },
       live: { ...base.live, ...(saved.live ?? {}) },
       doneQuests: Array.isArray(saved.doneQuests) ? saved.doneQuests : [],
     };
+    // Krize se v kapitole 1 nespouští: zrušit ji i ve starších uloženích, kde už začala
+    if (!TOXIC_TRIGGER_QUEST) {
+      loaded.toxic = false;
+      loaded.toxicCountdown = -1;
+    }
+    return loaded;
   } catch {
     return null;
   }

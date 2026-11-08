@@ -5,16 +5,23 @@ import {
   DEBUG_SPEEDS,
   EFFICIENCY_VO_FACTOR,
   INCINERATOR_VO_PER_MWH,
+  OFFLINE_FULL_RATE_SECONDS,
+  OFFLINE_REDUCED_RATE,
   SECONDS_PER_GAME_HOUR,
   INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
+  ONGOING_QUESTS_VISIBLE,
+  CHAPTER1_END_QUESTS,
+  ONGOING_UNLOCK_QUEST,
   QUESTS,
   QUESTS_VISIBLE,
   STORY_CHAPTER_END,
   STORY_INTRO,
   TOAST_SECONDS,
+  TOXIC_POPUP_TEXT,
+  TOXIC_POPUP_TITLE,
   VO_OVERFLOW_PRICE,
   UPGRADES,
 } from '../sim/balance';
@@ -76,7 +83,7 @@ app.innerHTML = `
     <summary>❓ Jak na to</summary>
     <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
     <p>Začni klepáním na odpad, pak najmi brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
-    <p>Za kredity zvyšuj <b>výkon</b>. Pozor: <b>v noci město bere málo</b>. Přebytek pak odvede 🔥 mařič (stojí peníze) nebo ho uloží 🔋 baterie. Když se přebytek nevejde nikam, síť se přetíží a přijde ⚫ blackout.</p>
+    <p>Máš <b>smlouvu na stálých 15 MW</b>, den i noc. Za kredity zvyšuj <b>výkon</b> spalovny a vedení (dráty a trafo), ať městu dodáš celých 15 MW. Pozor: vedení musí unést tvůj výkon, jinak se síť přetíží a přijde ⚫ blackout.</p>
   </details>
   <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
 
@@ -96,6 +103,9 @@ app.innerHTML = `
 
   <h2>Úkoly</h2>
   <div class="card" id="quests"></div>
+
+  <h2>Průběžné úkoly</h2>
+  <div class="card" id="ongoing"></div>
 
   <details class="card netdetail">
     <summary>🔌 Síť (podrobnosti)</summary>
@@ -127,6 +137,22 @@ function showToast(html: string): void {
   setTimeout(close, TOAST_SECONDS * 1000);
   toasts.appendChild(el);
 }
+// Velký popup při spuštění ekologické krize (po načtení hry s už probíhající krizí se neukazuje)
+let seenToxic = state.toxic;
+function showModal(title: string, text: string): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal"><h3>${title}</h3><p>${text}</p><button class="modal-ok">Rozumím</button></div>`;
+  overlay.querySelector('button')!.addEventListener('click', () => overlay.remove());
+  document.body.appendChild(overlay);
+}
+function announceCrisis(): void {
+  if (state.toxic && !seenToxic) {
+    seenToxic = true;
+    showModal(TOXIC_POPUP_TITLE, TOXIC_POPUP_TEXT);
+  }
+}
+
 function announceQuests(): void {
   for (const q of QUESTS) {
     if (state.doneQuests.includes(q.id) && !seenQuests.has(q.id)) {
@@ -143,10 +169,12 @@ function runOffline(): void {
   state.lastSeen = Date.now();
   const r = simulateOffline(state, elapsed);
   if (!r) return;
-  const min = Math.max(1, Math.round(r.seconds / 60));
+  const totalMin = Math.max(1, Math.round(r.seconds / 60));
+  const away = totalMin >= 60 ? `${Math.floor(totalMin / 60)} h ${totalMin % 60} min` : `${totalMin} min`;
   const vo = r.vo >= 0 ? `+${fmt(r.vo, 0)}` : `−${fmt(Math.abs(r.vo), 0)}`;
   showToast(
-    `🌙 <b>Zatímco jsi byl pryč (${min} min)</b><br>` +
+    `🌙 <b>Zatímco jsi byl pryč (${away})</b><br>` +
+      (r.seconds > OFFLINE_FULL_RATE_SECONDS ? `<small>První ${Math.round(OFFLINE_FULL_RATE_SECONDS / 60)} min na plno, zbytek jen na ${Math.round(OFFLINE_REDUCED_RATE * 100)} %.</small><br>` : '') +
       `💰 ${r.credits >= 0 ? '+' : '−'}${fmt(Math.abs(r.credits), 0)}, ⚡ ${fmt(r.delivered)} MWh dodáno, ♻️ ${vo} VO` +
       (r.blackouts > 0 ? `<br>⚫ ${r.blackouts}× vypadla síť` : ''),
   );
@@ -257,7 +285,7 @@ function render(): void {
     <div class="row"><span>Čas</span><b>Den ${s.day}, ${hh}:${mm} ${dayNight}</b></div>
     <div class="row"><span>Prestiž města</span><b>${prestige(s)}</b></div>
     <div class="row"><span>Spotřeba města</span><b>${fmt(l.demandMW)} MW</b></div>
-    <div class="row"><span>Rozsah spotřeby</span><b>${fmt(range.min)} (noc) – ${fmt(range.max)} MW (poledne)</b></div>
+    <div class="row"><span>Smlouva (stálý odběr)</span><b>${fmt(range.max)} MW, den i noc</b></div>
     <div class="row"><span>Výroba</span><b>${fmt(l.productionMW)} MW</b></div>
     <div class="row"><span>Dodáváme</span><b>${fmt(l.deliveredMW)} / ${lineCapacityMW(s)} MW (vedení)</b></div>
     <div class="row"><span>Baterie</span><b>${fmt(s.battery)} / ${bcap} MWh ${l.batteryFlowMW > 0.01 ? '⬆' : l.batteryFlowMW < -0.01 ? '⬇' : ''}</b></div>
@@ -295,10 +323,9 @@ function render(): void {
     let desc = def.description;
     if (def.id === 'power' && !max) {
       const next = incineratorNominalMW(s) + INCINERATOR_POWER_STEP_MW;
-      if (next > range.max) desc = `⚠️ Po koupi ${next} MW, ale město vezme nejvýš ${fmt(range.max)} MW. Zbytek by se zbytečně pálil.`;
-      else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty.`;
-      else if (next > range.min) desc = `Po koupi ${next} MW. Město v noci bere jen ${fmt(range.min)} MW, přebytek ${fmt(next - range.min)} MW pak potřebuje mařič nebo baterii.`;
-      else desc = `Po koupi ${next} MW. Město ho vždy vezme (v noci aspoň ${fmt(range.min)} MW).`;
+      if (next > range.max) desc = `⚠️ Po koupi ${next} MW, ale město odebere jen ${fmt(range.max)} MW (smlouva).`;
+      else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty a trafo.`;
+      else desc = `Po koupi ${next} MW z ${fmt(range.max)} MW smluvních.`;
     }
     if (def.id === 'efficiency' && !max) {
       const now = (incineratorNominalMW(s) * s.incineratorLevel / SECONDS_PER_GAME_HOUR) * voPerMWh(s, INCINERATOR_VO_PER_MWH);
@@ -307,22 +334,36 @@ function render(): void {
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
 
-  const chapterDone = QUESTS.every((q) => s.doneQuests.includes(q.id));
+  const mainQuests = QUESTS.filter((q) => !q.ongoing);
+  const mainDone = mainQuests.filter((q) => s.doneQuests.includes(q.id)).length;
+  const chapterDone = CHAPTER1_END_QUESTS.every((id) => s.doneQuests.includes(id));
   $('ending').innerHTML = chapterDone
     ? `<div class="card ending"><b>🏁 Konec kapitoly 1</b><p>${STORY_CHAPTER_END}</p></div>`
     : '';
 
-  const open = QUESTS.filter((q) => !s.doneQuests.includes(q.id));
+  const questRow = (q: (typeof QUESTS)[number]) => {
+    const p = Math.min(q.target, questProgress(s, q));
+    return `<div class="row quest"><span>${q.text}</span><span>${fmt(p, 0)}/${q.target} (+${q.reward}💰)</span></div>`;
+  };
+
+  const open = mainQuests.filter((q) => !s.doneQuests.includes(q.id));
   const shown = open.slice(0, QUESTS_VISIBLE);
   $('quests').innerHTML =
-    `<div class="row"><span>Splněno</span><b>${s.doneQuests.length} / ${QUESTS.length}</b></div>` +
-    shown
-      .map((q) => {
-        const p = Math.min(q.target, questProgress(s, q));
-        return `<div class="row quest"><span>${q.text}</span><span>${fmt(p, 0)}/${q.target} (+${q.reward}💰)</span></div>`;
-      })
-      .join('') +
+    `<div class="row"><span>Splněno</span><b>${mainDone} / ${mainQuests.length}</b></div>` +
+    shown.map(questRow).join('') +
     (open.length > shown.length ? `<small>…a ${open.length - shown.length} dalších úkolů se odemkne postupně.</small>` : '');
+
+  // Průběžné úkoly: dál vylepšovat; ukáží se jen ty, jejichž vylepšení už je odemčené
+  const ongoing = QUESTS.filter(
+    (q) => q.ongoing && !s.doneQuests.includes(q.id) && (!q.upgrade || isUnlocked(s, q.upgrade)),
+  );
+  const ongoingDone = QUESTS.filter((q) => q.ongoing && s.doneQuests.includes(q.id)).length;
+  const ongoingTotal = QUESTS.filter((q) => q.ongoing).length;
+  const ongoingUnlocked = s.doneQuests.includes(ONGOING_UNLOCK_QUEST);
+  $('ongoing').innerHTML = !ongoingUnlocked
+    ? '<small>Odemknou se po úkolu „Dosáhni autonomie“.</small>'
+    : `<div class="row"><span>Splněno</span><b>${ongoingDone} / ${ongoingTotal}</b></div>` +
+      ongoing.slice(0, ONGOING_QUESTS_VISIBLE).map(questRow).join('');
 }
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce
@@ -336,6 +377,7 @@ function frame(now: number): void {
     acc -= TICK_DT;
   }
   announceQuests();
+  announceCrisis();
   render();
   requestAnimationFrame(frame);
 }

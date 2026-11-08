@@ -16,7 +16,10 @@ export interface GameState {
   overload: number; // sekundy přetížení
   blackout: number; // zbývající sekundy výpadku
   lastSeen: number; // čas (ms) posledního uložení nebo schování hry, pro idle dopočet
+  chapter: number; // aktuální kapitola (odemyká mařič/baterii v 3 a regulátor ve 4)
+  contractMet: boolean; // splněna smlouva (město aspoň jednou dostalo smluvních MW)
   toxic: boolean; // ekologická krize začala (toxický odpad)
+  toxicCountdown: number; // sekundy do spuštění krize (-1 = odpočet neběží)
   doneQuests: string[];
   // hodnoty z posledního tiku (jen pro zobrazení)
   live: {
@@ -56,7 +59,10 @@ export function newGame(): GameState {
     overload: 0,
     blackout: 0,
     lastSeen: 0,
+    chapter: 1,
+    contractMet: false,
     toxic: false,
+    toxicCountdown: -1,
     doneQuests: [],
     live: {
       productionMW: 0,
