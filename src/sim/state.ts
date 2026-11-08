@@ -17,6 +17,7 @@ export interface GameState {
   blackout: number; // zbývající sekundy výpadku
   lastSeen: number; // čas (ms) posledního uložení nebo schování hry, pro idle dopočet
   toxic: boolean; // ekologická krize začala (toxický odpad)
+  toxicCountdown: number; // sekundy do spuštění krize (-1 = odpočet neběží)
   doneQuests: string[];
   // hodnoty z posledního tiku (jen pro zobrazení)
   live: {
@@ -57,6 +58,7 @@ export function newGame(): GameState {
     blackout: 0,
     lastSeen: 0,
     toxic: false,
+    toxicCountdown: -1,
     doneQuests: [],
     live: {
       productionMW: 0,

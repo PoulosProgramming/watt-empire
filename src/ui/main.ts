@@ -18,7 +18,8 @@ import {
   STORY_CHAPTER_END,
   STORY_INTRO,
   TOAST_SECONDS,
-  TOXIC_CRISIS_QUESTS,
+  TOXIC_POPUP_TEXT,
+  TOXIC_POPUP_TITLE,
   VO_OVERFLOW_PRICE,
   UPGRADES,
 } from '../sim/balance';
@@ -134,6 +135,22 @@ function showToast(html: string): void {
   setTimeout(close, TOAST_SECONDS * 1000);
   toasts.appendChild(el);
 }
+// Velký popup při spuštění ekologické krize (po načtení hry s už probíhající krizí se neukazuje)
+let seenToxic = state.toxic;
+function showModal(title: string, text: string): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal"><h3>${title}</h3><p>${text}</p><button class="modal-ok">Rozumím</button></div>`;
+  overlay.querySelector('button')!.addEventListener('click', () => overlay.remove());
+  document.body.appendChild(overlay);
+}
+function announceCrisis(): void {
+  if (state.toxic && !seenToxic) {
+    seenToxic = true;
+    showModal(TOXIC_POPUP_TITLE, TOXIC_POPUP_TEXT);
+  }
+}
+
 function announceQuests(): void {
   for (const q of QUESTS) {
     if (state.doneQuests.includes(q.id) && !seenQuests.has(q.id)) {
@@ -332,7 +349,6 @@ function render(): void {
   const shown = open.slice(0, QUESTS_VISIBLE);
   $('quests').innerHTML =
     `<div class="row"><span>Splněno</span><b>${mainDone} / ${mainQuests.length}</b></div>` +
-    (mainDone < TOXIC_CRISIS_QUESTS ? `<small>Po ${TOXIC_CRISIS_QUESTS}. úkolu přijde ekologická krize.</small>` : '') +
     shown.map(questRow).join('') +
     (open.length > shown.length ? `<small>…a ${open.length - shown.length} dalších úkolů se odemkne postupně.</small>` : '');
 
@@ -359,6 +375,7 @@ function frame(now: number): void {
     acc -= TICK_DT;
   }
   announceQuests();
+  announceCrisis();
   render();
   requestAnimationFrame(frame);
 }

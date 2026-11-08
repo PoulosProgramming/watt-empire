@@ -44,3 +44,9 @@ small { color: #94a3b8; }
 .toast { pointer-events: auto; max-width: 456px; width: 100%; background: #14532d; border: 2px solid #4ade80; color: #fff; border-radius: 12px; padding: 12px 14px; font-size: 15px; line-height: 1.35; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
 
 .netdetail summary { font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
+.modal { background: #7f1d1d; border: 3px solid #f87171; border-radius: 16px; max-width: 420px; width: 100%; padding: 20px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.modal h3 { margin: 0 0 12px; font-size: 24px; }
+.modal p { margin: 0 0 18px; font-size: 16px; line-height: 1.45; color: #fee2e2; }
+.modal-ok { width: 100%; min-height: 52px; background: #dc2626; font-size: 18px; }

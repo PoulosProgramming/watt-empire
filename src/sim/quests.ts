@@ -1,4 +1,4 @@
-import { QUESTS, type QuestDef, type Requirement } from './balance';
+import { QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, type QuestDef, type Requirement } from './balance';
 import type { GameState } from './state';
 
 export function requirementProgress(s: GameState, r: Requirement): number {
@@ -20,7 +20,18 @@ export function checkQuests(s: GameState): void {
   }
 }
 
-// Počet splněných hlavních úkolů (průběžné se nepočítají do kapitoly ani do spuštění krize)
-export function mainQuestsDone(s: GameState): number {
-  return QUESTS.filter((q) => !q.ongoing && s.doneQuests.includes(q.id)).length;
+
+// Ekologická krize: po splnění spouštěcího úkolu začne odpočet a krize se spustí sama (bez varování).
+// Funguje i pro uložení, kde byl úkol splněn dřív, než odpočet existoval.
+export function runCrisis(s: GameState, dt: number): void {
+  if (s.toxic) return;
+  if (s.toxicCountdown < 0) {
+    if (s.doneQuests.includes(TOXIC_TRIGGER_QUEST)) s.toxicCountdown = TOXIC_DELAY_SECONDS;
+    return;
+  }
+  s.toxicCountdown -= dt;
+  if (s.toxicCountdown <= 0) {
+    s.toxic = true;
+    s.toxicCountdown = -1;
+  }
 }

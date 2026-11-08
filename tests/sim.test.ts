@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_QUESTS, UPGRADES } from '../src/sim/balance';
+import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
-import { mainQuestsDone } from '../src/sim/quests';
 import { newGame } from '../src/sim/state';
 
 const run = (s: ReturnType<typeof newGame>, seconds: number) => {
@@ -150,39 +149,38 @@ describe('spalovna', () => {
     expect(s.credits).toBeGreaterThanOrEqual(0);
   });
 
-  const doneQuests = (n: number) => QUESTS.slice(0, n).map((q) => q.id);
-
-  it('po splnění 15. úkolu (a při autonomii) začne ekologická krize', () => {
+  it('po splnění spouštěcího úkolu začne odpočet a krize se spustí sama za 15 s, bez autonomie', () => {
     const s = newGame();
-    s.doneQuests = doneQuests(TOXIC_CRISIS_QUESTS);
+    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== TOXIC_TRIGGER_QUEST);
+    s.upgrades.line = 2; // splní úkol "Posil dráty a trafo na úroveň 2"
     s.vo = 100;
-    s.upgrades.worker = 5; // autonomie
-    s.credits = 100;
     tick(s);
+    expect(s.doneQuests).toContain(TOXIC_TRIGGER_QUEST);
+    expect(s.live.autonomous).toBe(false); // na autonomii se nehledí
+    expect(s.toxic).toBe(false);
+    expect(s.toxicCountdown).toBeGreaterThan(0);
+    run(s, TOXIC_DELAY_SECONDS - 1);
+    expect(s.toxic).toBe(false);
+    run(s, 2);
     expect(s.toxic).toBe(true);
+    expect(s.toxicCountdown).toBe(-1);
   });
 
-  it('před 15. úkolem krize nezačne, i když je hráč autonomní a dodal hodně MWh', () => {
+  it('bez spouštěcího úkolu krize nezačne', () => {
     const s = newGame();
-    s.doneQuests = doneQuests(TOXIC_CRISIS_QUESTS - 1);
+    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== TOXIC_TRIGGER_QUEST);
+    s.vo = 100;
     s.delivered = 1000;
-    s.vo = 100;
-    s.upgrades.worker = 5;
-    s.credits = 100;
-    tick(s);
-    expect(s.live.autonomous).toBe(true);
+    run(s, 60);
     expect(s.toxic).toBe(false);
+    expect(s.toxicCountdown).toBe(-1);
   });
 
-  it('bez autonomie krize nezačne, ani když je splněno 15 úkolů', () => {
+  it('uložení, kde byl spouštěcí úkol splněn dřív, také spustí odpočet', () => {
     const s = newGame();
-    s.doneQuests = doneQuests(TOXIC_CRISIS_QUESTS);
-    s.vo = 100;
-    s.upgrades.worker = 1; // 0,4 VO/s, spalovna potřebuje 1 VO/s
-    s.credits = 100;
+    s.doneQuests = [TOXIC_TRIGGER_QUEST];
     tick(s);
-    expect(s.live.autonomous).toBe(false);
-    expect(s.toxic).toBe(false);
+    expect(s.toxicCountdown).toBeGreaterThan(0);
   });
 
   it('autonomie: 5 brigádníků stačí na 6 MW, 4 ne', () => {
@@ -287,11 +285,11 @@ describe('krize v rozpisu příjmů', () => {
   it('ztráta z krize se počítá zvlášť a součet sedí', () => {
     const s = newGame();
     s.doneQuests = QUESTS.map((q) => q.id);
+    s.toxic = true;
     s.vo = 100;
-    s.upgrades.worker = 5; // autonomie
+    s.upgrades.worker = 5;
     s.credits = 100;
     tick(s);
-    expect(s.toxic).toBe(true);
     const full = s.live.incomePerSecond + s.live.crisisLossPerSecond;
     expect(s.live.crisisLossPerSecond).toBeGreaterThan(0);
     expect(s.live.incomePerSecond / full).toBeCloseTo(0.6, 5);
@@ -391,18 +389,10 @@ describe('idle (offline dopočet)', () => {
 });
 
 describe('průběžné úkoly', () => {
-  it('jsou za hlavními a nepočítají se do hlavních úkolů ani do krize', () => {
+  it('jsou v seznamu až za hlavními úkoly', () => {
     const firstOngoing = QUESTS.findIndex((q) => q.ongoing);
-    expect(firstOngoing).toBeGreaterThan(TOXIC_CRISIS_QUESTS);
+    expect(firstOngoing).toBeGreaterThan(QUESTS.findIndex((q) => q.id === TOXIC_TRIGGER_QUEST));
     expect(QUESTS.slice(firstOngoing).every((q) => q.ongoing)).toBe(true);
-    const s = newGame();
-    s.doneQuests = QUESTS.filter((q) => q.ongoing).map((q) => q.id);
-    expect(mainQuestsDone(s)).toBe(0);
-    s.vo = 100;
-    s.upgrades.worker = 5;
-    s.credits = 100;
-    tick(s);
-    expect(s.toxic).toBe(false);
   });
 
   it('průběžný úkol vyplatí odměnu, když je splněn', () => {
@@ -413,5 +403,30 @@ describe('průběžné úkoly', () => {
     tick(s);
     expect(s.doneQuests).toContain('o_eff1');
     expect(s.credits).toBeGreaterThan(before);
+  });
+});
+
+describe('brigádníci v kapitole 1', () => {
+  it('maximum je 6 a víc koupit nejde', () => {
+    const s = newGame();
+    s.upgrades.power = 1;
+    s.credits = 1e9;
+    for (let i = 0; i < 20; i++) buyUpgrade(s, 'worker');
+    expect(s.upgrades.worker).toBe(6);
+  });
+
+  it('6 brigádníků zvládne plných 10 MW, když je účinnost aspoň 4', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id);
+    s.upgrades.power = 7; // 10 MW
+    s.upgrades.worker = 6;
+    s.credits = 1000;
+    s.vo = 100;
+    s.upgrades.efficiency = 3;
+    tick(s);
+    expect(s.live.autonomous).toBe(false);
+    s.upgrades.efficiency = 4;
+    tick(s);
+    expect(s.live.autonomous).toBe(true);
   });
 });
