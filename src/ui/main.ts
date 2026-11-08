@@ -14,6 +14,8 @@ import {
   OVERLOAD_TOLERANCE_SECONDS,
   ONGOING_QUESTS_VISIBLE,
   CHAPTER1_END_QUESTS,
+  CONTRACT_MW,
+  TRACKED_QUESTS,
   ONGOING_UNLOCK_QUEST,
   QUESTS,
   QUESTS_VISIBLE,
@@ -29,7 +31,7 @@ import { isDay } from '../sim/daynight';
 import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voPerMWh, voStorageMax } from '../sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../sim/game';
 import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
-import { questProgress } from '../sim/quests';
+import { questFraction, questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
 import { createMap } from './map';
 import { newGame } from '../sim/state';
@@ -79,6 +81,7 @@ app.innerHTML = `
       <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
     </div>
     <div id="statdetail"></div>
+    <div id="tracker"></div>
     <div id="alerts"></div>
   </div>
   <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
@@ -210,6 +213,13 @@ function runOffline(): void {
 runOffline(); // po načtení hry dopočítat čas, kdy hráč nehrál
 
 const $ = (id: string) => document.getElementById(id)!;
+
+// Sledování úkolů: klepnutím na hlavičku se sbalí na jeden řádek s ukazatelem kapitoly
+let trackerCollapsed = false;
+// (reaguje při stisku, protože se obsah překresluje několikrát za sekundu a při 'click' by se prvek mezi stiskem a pustěním vyměnil)
+$('tracker').addEventListener('pointerdown', (e) => {
+  if ((e.target as HTMLElement).closest('.tr-head')) trackerCollapsed = !trackerCollapsed;
+});
 
 // Záložky na boku: klepnutí otevře menu přes mapu, další klepnutí (nebo ✕) ho zavře
 const TAB_TITLES: Record<string, string> = {
@@ -402,6 +412,31 @@ function render(): void {
     `<div class="row"><span>Splněno</span><b>${mainDone} / ${mainQuests.length}</b></div>` +
     shown.map(questRow).join('') +
     (open.length > shown.length ? `<small>…a ${open.length - shown.length} dalších úkolů se odemkne postupně.</small>` : '');
+
+  // Sledování úkolů na obrazovce: vždy až TRACKED_QUESTS aktivních úkolů s ukazatelem postupu
+  // (nejdřív hlavní, když jich zbývá méně, doplní se průběžnými) a ukazatel postupu kapitoly
+  const ongoingNow = QUESTS.filter(
+    (q) => q.ongoing && !s.doneQuests.includes(q.id) && (!q.upgrade || isUnlocked(s, q.upgrade)),
+  );
+  const tracked = [...open, ...(s.doneQuests.includes(ONGOING_UNLOCK_QUEST) ? ongoingNow : [])].slice(0, TRACKED_QUESTS);
+  const progressLabel = (q: (typeof QUESTS)[number]): string => {
+    if (q.kind === 'contract') return `${fmt(s.live.deliveredMW)} / ${CONTRACT_MW} MW`;
+    if (q.kind === 'autonomy') return `${fmt(s.live.voPerSecond, 1)} / ${fmt(s.live.voNeedPerSecond, 1)} VO/s`;
+    const done = Math.min(q.target, questProgress(s, q));
+    return q.kind === 'delivered' ? `${fmt(done, 0)} / ${q.target} MWh` : `${fmt(done, 0)} / ${q.target}`;
+  };
+  const chapterPct = Math.round((mainDone / mainQuests.length) * 100);
+  $('tracker').innerHTML =
+    `<div class="tr-head"><span>${trackerCollapsed ? '▸' : '▾'} Kapitola 1 · ${mainDone} / ${mainQuests.length} úkolů</span><span>${chapterPct} %</span></div>` +
+    `<div class="bar chap"><i style="width:${chapterPct}%"></i></div>` +
+    (trackerCollapsed
+      ? ''
+      : tracked
+          .map((q) => {
+            const pct = Math.round(questFraction(s, q) * 100);
+            return `<div class="tr-row"><div class="tr-top"><span>${q.ongoing ? '🔁 ' : ''}${q.text}</span><span>${progressLabel(q)} · +${q.reward}💰</span></div><div class="bar q"><i style="width:${pct}%"></i></div></div>`;
+          })
+          .join(''));
 
   // Průběžné úkoly: dál vylepšovat; ukáží se jen ty, jejichž vylepšení už je odemčené
   const ongoing = QUESTS.filter(

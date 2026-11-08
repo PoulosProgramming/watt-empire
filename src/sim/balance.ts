@@ -108,6 +108,7 @@ export interface QuestDef extends Requirement {
 // Kolik nejbližších nesplněných úkolů se hráči zobrazí (ostatní se odemykají postupně)
 export const QUESTS_VISIBLE = 3;
 export const ONGOING_UNLOCK_QUEST = 'autonomy'; // průběžné úkoly se ukážou až po tomto úkolu
+export const TRACKED_QUESTS = 3; // kolik aktivních úkolů je vždy vidět na obrazovce
 export const ONGOING_QUESTS_VISIBLE = 2; // kolik průběžných úkolů se zobrazí najednou
 
 export const QUESTS: QuestDef[] = [
