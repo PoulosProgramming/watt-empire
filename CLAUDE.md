@@ -29,4 +29,5 @@ Idle tycoon o elektrické síti, webová hra (mobil na výšku + PC). Design je 
 ## Stav plánu (GDD sekce 8)
 - [x] 1. Příprava
 - [x] 2. Jádro v číslech (HTML tlačítka, bez mapy; debug panel ×10 a +kredity)
+  - Po prvním hraní na mobilu: sklad spalovny s hysterezí, posuvník výkonu (poplatek), auto regulátor, nápověda, víc úkolů, dražší brigádníci.
 - [ ] 3. Mapa a stavění … 7. Kapitola 3

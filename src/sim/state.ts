@@ -9,7 +9,9 @@ export interface GameState {
   taps: number;
   delivered: number; // celkem dodáno městu (MWh)
   upgrades: Record<UpgradeId, number>;
-  incineratorOn: boolean;
+  incineratorOn: boolean; // hlavní vypínač
+  incineratorRunning: boolean; // skutečně vyrábí (sklad VO s hysterezí)
+  incineratorLevel: number; // nastavený výkon 0.3..1
   battery: number; // uloženo (MWh)
   overload: number; // sekundy přetížení
   blackout: number; // zbývající sekundy výpadku
@@ -35,8 +37,10 @@ export function newGame(): GameState {
     day: 1,
     taps: 0,
     delivered: 0,
-    upgrades: { worker: 0, efficiency: 0, line: 0, battery: 0 },
+    upgrades: { worker: 0, efficiency: 0, line: 0, battery: 0, regulator: 0 },
     incineratorOn: true,
+    incineratorRunning: false,
+    incineratorLevel: 1,
     battery: 0,
     overload: 0,
     blackout: 0,
