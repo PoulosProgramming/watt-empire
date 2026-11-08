@@ -29,16 +29,19 @@ Idle tycoon o elektrické síti, webová hra (mobil na výšku + PC). Design je 
 ## Stav plánu (GDD sekce 8)
 - [x] 1. Příprava
 - [x] 2. Jádro v číslech (HTML tlačítka, bez mapy; debug panel ×10 a +kredity)
-  - Po prvním hraní na mobilu: sklad spalovny s hysterezí, posuvník výkonu (poplatek), auto regulátor, nápověda, víc úkolů, dražší brigádníci.
+  - Po prvním hraní na mobilu (2 kola): sklad spalovny s hysterezí, pevný start 3 MW a výkon nákupem, mařič, větší baterie, auto regulátor až na konci kapitoly, nápověda, 12 úkolů, krize po 250 MWh.
 - [ ] 3. Mapa a stavění … 7. Kapitola 3
 
-## Poznatky z hraní (první test na mobilu, 8. 11. 2026)
+## Poznatky z hraní (první testy na mobilu, 8. 11. 2026)
 Zapisuj sem, co ukázalo hraní, ať další agent ví, proč je hra nastavená tak, jak je.
-- **Blackouty bez vysvětlení:** hráč nechápal, proč se síť přetěžuje. Proto je v UI nápověda „Jak na to" a hláška u přetížení říká, co dělat. Při dalších mechanikách vždy přidat i krátké vysvětlení pro hráče.
-- **Noční spotřeba je malá** (35 % ze 10 MW = 3,5 MW). Spalovna proto musí jít stáhnout pod tuto hodnotu (min. 30 %), jinak hráč bez baterie nepřežije noc. Řešení: posuvník výkonu (poplatek) a upgrade Automatický regulátor.
-- **Houpání výroby 0↔6 MW** bylo jen na startu, kdy je málo VO. Spalovna má proto sklad s hysterezí: rozjede se při 25 VO a zhasne, až když sklad nestačí.
-- **Brigádníci byli moc levní a rychlí** (hráč nepotřeboval žádnou ruční práci). Zdraženo (růst ceny 1,5×) a omezeno na 15. Pozor: v kroku 4 je přidat omezení množstvím odpadu na ostrově.
-- **Úkoly došly za ~10 minut** (s cheaty). Přidáno 8 úkolů s různými cíli. Další obsah přijde s krizí a postavami v kroku 4.
+- **Blackouty bez vysvětlení / moc složité na začátku:** hráč nechápal přetížení a posuvník výkonu reagoval divně a stál kredity. Proto je posuvník pryč. Spalovna běží pevně na 3 MW (pod noční spotřebou 7 MW), takže se na začátku nic nepřetíží. Výkon se zvyšuje nákupem (+1 MW za úroveň). V UI je nápověda „Jak na to".
+- **Přebytek v noci řeší hráč nákupem:** mařič (odvede 2 MW za úroveň, stojí 4 kredity za MWh) a baterie (10 MWh/úroveň). Automatický regulátor je záměrně velmi drahý (12000) a patří na konec kapitoly 1, protože řeší vše naráz.
+- **Město limitovalo hráče** a dráty byly zbytečné. Základní spotřeba zvýšena na 14 MW (ve dne 8–14, v noci 7 MW). Vedení má teď základ 6 MW (+3 za úroveň).
+- **Brigádníci byli moc levní a rychlí;** účinnost spalovny nikdo nekupoval. Proto dražší brigádníci (základ 120, růst 1,75×, max 12), nižší těžba na brigádníka (0,3 VO/s) a odpad je úzké hrdlo při vyšším výkonu, takže účinnost má smysl.
+- **Kapitola 1 se dala dohrát za ~10 min.** Hranice jsme zvedli: krize po 250 MWh, konec kapitoly (prestiž 2) po 400 MWh, 12 úkolů. Bot s rozumnou strategií ji dohraje za ~23 min (člověk pomaleji).
+- **Houpání výroby 0↔6 MW** bylo jen na startu (málo VO). Řeší sklad s hysterezí: spalovna se rozjede při 15 VO a zhasne, když sklad nestačí.
+- **Ekologická krize chyběla.** Zatím jen v číslech: po 250 MWh se objeví upozornění a město platí 60 %. Vizuální toxický odpad (2×2 na mapě) přijde s mapou (krok 3/4), řešení v kapitole 2.
 - **Tlačítko „Třídit odpad"** bylo moc velké a hráč ho po chvíli nepoužíval (na mapě se tříbí klepáním na odpad, krok 3). Zmenšeno.
 - **Ladění:** ×10 rychlost je hodně používaná, protože pasivní fáze je nudná. Tlačítko +1000 kreditů ničí zkoušení tempa, ve finální verzi ho schovat.
-- **Nevyřešeno:** čím se bude zvedat spotřeba města (budovy klikem, růst jen při online hraní, viz GDD sekce 9) a čím hráče motivovat po dokončení úkolů (toxická krize po ~90 MWh).
+- **Baterie** dlouho nic nepřinášela (přebytek se prostě ztrácel). Zvětšena na 10 MWh/úroveň. Vyplatí se až při výkonu nad ~8 MW, kam hráč v kapitole 1 dojde pozdě. Zkontrolovat v dalším testu.
+- **Nevyřešeno:** čím se bude zvedat spotřeba města (budovy klikem, růst jen při online hraní, viz GDD sekce 9).
