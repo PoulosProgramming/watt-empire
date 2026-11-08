@@ -1,7 +1,13 @@
 import {
   EFFICIENCY_VO_FACTOR,
+  INCINERATOR_BASE_MW,
+  INCINERATOR_POWER_STEP_MW,
+  INCINERATOR_VO_PER_MWH,
+  SECONDS_PER_GAME_HOUR,
   UPGRADES,
+  VO_OVERFLOW_PRICE,
   VO_PER_TAP,
+  VO_STORAGE_SECONDS,
   WORKER_VO_PER_SECOND,
   WORKER_WAGE_PER_SECOND,
   type UpgradeId,
@@ -20,8 +26,43 @@ export function upgradeCost(id: UpgradeId, level: number): number {
   return Math.ceil(def.baseCost * Math.pow(def.growth, level));
 }
 
+export const incineratorNominalMW = (s: GameState) =>
+  INCINERATOR_BASE_MW + s.upgrades.power * INCINERATOR_POWER_STEP_MW;
+
+// Kolik VO se vejde do skladu spalovny (strop = VO_STORAGE_SECONDS sekund provozu při plném výkonu)
+export const voStorageMax = (s: GameState) =>
+  (incineratorNominalMW(s) / SECONDS_PER_GAME_HOUR) * INCINERATOR_VO_PER_MWH * VO_STORAGE_SECONDS;
+
+// Přidá VO do skladu; co se nevejde, se automaticky prodá za kredity.
+export function addVO(s: GameState, amount: number): void {
+  const stored = Math.min(amount, Math.max(0, voStorageMax(s) - s.vo));
+  s.vo += stored;
+  const overflow = amount - stored;
+  if (overflow > 0) {
+    const gain = overflow * VO_OVERFLOW_PRICE;
+    s.credits += gain;
+    s.live.overflowAccum += gain;
+  }
+}
+
+// Vyhlazený příjem z prodeje přebytečného VO (jen pro zobrazení v rozpisu)
+export function updateOverflowRate(s: GameState, dt: number): void {
+  const k = 0.1;
+  s.live.overflowIncomePerSecond = s.live.overflowIncomePerSecond * (1 - k) + (s.live.overflowAccum / dt) * k;
+  s.live.overflowAccum = 0;
+}
+
+// Starší uložení mohlo mít víc VO, než se teď vejde do skladu
+export function clampVO(s: GameState): void {
+  const over = s.vo - voStorageMax(s);
+  if (over > 0) {
+    s.vo -= over;
+    s.credits += over * VO_OVERFLOW_PRICE;
+  }
+}
+
 export function tap(s: GameState): void {
-  s.vo += VO_PER_TAP;
+  addVO(s, VO_PER_TAP);
   s.taps += 1;
 }
 
@@ -65,7 +106,7 @@ export function runWorkers(s: GameState, dt: number): void {
   }
   s.live.workersPaused = false;
   s.credits -= wage;
-  s.vo += workers * WORKER_VO_PER_SECOND * dt;
+  addVO(s, workers * WORKER_VO_PER_SECOND * dt);
   s.live.voPerSecond = workers * WORKER_VO_PER_SECOND;
   s.live.wagePerSecond = workers * WORKER_WAGE_PER_SECOND;
 }

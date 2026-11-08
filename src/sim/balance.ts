@@ -12,6 +12,9 @@ export const START_HOUR = 8;
 // ---- Ruční sběr a brigádníci ----
 export const VO_PER_TAP = 1; // 5 tapů na odpad = 5 VO (GDD)
 export const WORKER_VO_PER_SECOND = 0.4; // 5 brigádníků = 2 VO/s = přesně na 6 MW
+// Sklad VO u spalovny má strop = tolik sekund provozu při plném výkonu. Přebytek se automaticky prodá.
+export const VO_STORAGE_SECONDS = 60;
+export const VO_OVERFLOW_PRICE = 0.3; // kredity za 1 prodaný VO navíc
 export const WORKER_WAGE_PER_SECOND = 0.2; // mzda v kreditech za sekundu
 
 // ---- Spalovna ----
