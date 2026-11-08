@@ -13,6 +13,7 @@ import {
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
   ONGOING_QUESTS_VISIBLE,
+  ONGOING_UNLOCK_QUEST,
   QUESTS,
   QUESTS_VISIBLE,
   STORY_CHAPTER_END,
@@ -358,10 +359,11 @@ function render(): void {
   );
   const ongoingDone = QUESTS.filter((q) => q.ongoing && s.doneQuests.includes(q.id)).length;
   const ongoingTotal = QUESTS.filter((q) => q.ongoing).length;
-  $('ongoing').innerHTML = ongoing.length
-    ? `<div class="row"><span>Splněno</span><b>${ongoingDone} / ${ongoingTotal}</b></div>` +
-      ongoing.slice(0, ONGOING_QUESTS_VISIBLE).map(questRow).join('')
-    : `<div class="row"><span>Splněno</span><b>${ongoingDone} / ${ongoingTotal}</b></div>`;
+  const ongoingUnlocked = s.doneQuests.includes(ONGOING_UNLOCK_QUEST);
+  $('ongoing').innerHTML = !ongoingUnlocked
+    ? '<small>Odemknou se po úkolu „Dosáhni autonomie“.</small>'
+    : `<div class="row"><span>Splněno</span><b>${ongoingDone} / ${ongoingTotal}</b></div>` +
+      ongoing.slice(0, ONGOING_QUESTS_VISIBLE).map(questRow).join('');
 }
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce

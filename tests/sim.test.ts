@@ -398,10 +398,10 @@ describe('průběžné úkoly', () => {
   it('průběžný úkol vyplatí odměnu, když je splněn', () => {
     const s = newGame();
     s.doneQuests = QUESTS.filter((q) => !q.ongoing).map((q) => q.id);
-    s.upgrades.efficiency = 1;
+    s.upgrades.efficiency = 4;
     const before = s.credits;
     tick(s);
-    expect(s.doneQuests).toContain('o_eff1');
+    expect(s.doneQuests).toContain('o_eff4');
     expect(s.credits).toBeGreaterThan(before);
   });
 });
@@ -428,5 +428,28 @@ describe('brigádníci v kapitole 1', () => {
     s.upgrades.efficiency = 4;
     tick(s);
     expect(s.live.autonomous).toBe(true);
+  });
+});
+
+describe('pořadí úkolů', () => {
+  it('trigger krize je 15. hlavní úkol a účinnost má v hlavním řetězci tři úkoly před ním', () => {
+    const main = QUESTS.filter((q) => !q.ongoing);
+    expect(main[14].id).toBe(TOXIC_TRIGGER_QUEST);
+    const beforeTrigger = main.slice(0, 14).filter((q) => q.upgrade === 'efficiency').length;
+    expect(beforeTrigger).toBe(3);
+  });
+
+  it('mařič a baterie už nejsou v hlavním řetězci', () => {
+    const main = QUESTS.filter((q) => !q.ongoing);
+    expect(main.some((q) => q.upgrade === 'dump' || q.upgrade === 'battery')).toBe(false);
+  });
+
+  it('každý úkol na vylepšení má dosažitelnou úroveň', () => {
+    for (const q of QUESTS) {
+      if (q.kind === 'upgrade' && q.upgrade) {
+        const def = UPGRADES.find((u) => u.id === q.upgrade)!;
+        expect(q.target).toBeLessThanOrEqual(def.maxLevel);
+      }
+    }
   });
 });

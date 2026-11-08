@@ -102,42 +102,47 @@ export interface QuestDef extends Requirement {
 
 // Kolik nejbližších nesplněných úkolů se hráči zobrazí (ostatní se odemykají postupně)
 export const QUESTS_VISIBLE = 3;
+export const ONGOING_UNLOCK_QUEST = 'autonomy'; // průběžné úkoly se ukážou až po tomto úkolu
 export const ONGOING_QUESTS_VISIBLE = 2; // kolik průběžných úkolů se zobrazí najednou
 
 export const QUESTS: QuestDef[] = [
+  // --- Hlavní řetězec (kapitola 1): úkoly jdou v pořadí, jak je hráč potřebuje ---
   { id: 'deliver1', text: 'Dodej městu 1 MWh', kind: 'delivered', target: 1, reward: 20 },
   { id: 'tap25', text: 'Vyčisti 25 odpadků (ruční tapy)', kind: 'taps', target: 25, reward: 30 },
   { id: 'power1', text: 'Zvyš výkon spalovny na úroveň 1 (4 MW, odemkne brigádníky)', kind: 'upgrade', upgrade: 'power', target: 1, reward: 150 },
   { id: 'worker3', text: 'Najmi 3 brigádníky', kind: 'upgrade', upgrade: 'worker', target: 3, reward: 80 },
   { id: 'power2', text: 'Zvyš výkon spalovny na úroveň 2 (5 MW)', kind: 'upgrade', upgrade: 'power', target: 2, reward: 300 },
   { id: 'deliver30', text: 'Dodej městu 30 MWh', kind: 'delivered', target: 30, reward: 150 },
+  { id: 'eff1', text: 'Vylepši účinnost spalovny na úroveň 1 (méně VO na stejný výkon)', kind: 'upgrade', upgrade: 'efficiency', target: 1, reward: 500 },
   { id: 'power3', text: 'Zvyš výkon spalovny na úroveň 3 (6 MW, tolik unese vedení)', kind: 'upgrade', upgrade: 'power', target: 3, reward: 250 },
   { id: 'line1', text: 'Posil dráty a trafo (kvůli výkonu nad 6 MW)', kind: 'upgrade', upgrade: 'line', target: 1, reward: 300 },
   { id: 'autonomy', text: 'Dosáhni autonomie: brigádníci zásobí spalovnu odpadem, nemusíš klikat', kind: 'autonomy', target: 1, reward: 400 },
+  { id: 'eff2', text: 'Vylepši účinnost spalovny na úroveň 2', kind: 'upgrade', upgrade: 'efficiency', target: 2, reward: 900 },
   { id: 'power4', text: 'Zvyš výkon spalovny na úroveň 4 (7 MW, tolik město bere v noci)', kind: 'upgrade', upgrade: 'power', target: 4, reward: 350 },
-  { id: 'dump1', text: 'Kup mařič přebytku (odvede přebytek v noci)', kind: 'upgrade', upgrade: 'dump', target: 1, reward: 400 },
-  { id: 'battery1', text: 'Kup první baterii', kind: 'upgrade', upgrade: 'battery', target: 1, reward: 500 },
   { id: 'deliver100', text: 'Dodej městu 100 MWh', kind: 'delivered', target: 100, reward: 600 },
+  { id: 'eff3', text: 'Vylepši účinnost spalovny na úroveň 3', kind: 'upgrade', upgrade: 'efficiency', target: 3, reward: 1500 },
   { id: 'line2', text: 'Posil dráty a trafo na úroveň 2 (12 MW)', kind: 'upgrade', upgrade: 'line', target: 2, reward: 800 },
+  // --- Po ekologické krizi ---
   { id: 'deliver250', text: 'Dodej městu 350 MWh', kind: 'delivered', target: 350, reward: 1000 },
   { id: 'regulator', text: 'Kup automatický regulátor', kind: 'upgrade', upgrade: 'regulator', target: 1, reward: 1500 },
   { id: 'deliver400', text: 'Dodej městu 500 MWh (konec kapitoly 1)', kind: 'delivered', target: 500, reward: 2000 },
-  // Průběžné úkoly: dál vylepšovat (odpovídají tomu, co se hráči vyplatí)
-  { id: 'o_eff1', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 1', kind: 'upgrade', upgrade: 'efficiency', target: 1, reward: 200 },
-  { id: 'o_worker6', ongoing: true, text: 'Najmi 6 brigádníků', kind: 'upgrade', upgrade: 'worker', target: 6, reward: 400 },
-  { id: 'o_power5', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 5 (8 MW)', kind: 'upgrade', upgrade: 'power', target: 5, reward: 800 },
-  { id: 'o_eff3', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 3', kind: 'upgrade', upgrade: 'efficiency', target: 3, reward: 600 },
-  { id: 'o_battery2', ongoing: true, text: 'Kup druhou baterii', kind: 'upgrade', upgrade: 'battery', target: 2, reward: 900 },
-  { id: 'o_power6', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 6 (9 MW)', kind: 'upgrade', upgrade: 'power', target: 6, reward: 1500 },
-  { id: 'o_line3', ongoing: true, text: 'Posil dráty a trafo na úroveň 3 (15 MW)', kind: 'upgrade', upgrade: 'line', target: 3, reward: 1200 },
-  { id: 'o_eff5', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 5', kind: 'upgrade', upgrade: 'efficiency', target: 5, reward: 1500 },
-  { id: 'o_dump2', ongoing: true, text: 'Kup druhý mařič', kind: 'upgrade', upgrade: 'dump', target: 2, reward: 1200 },
-  { id: 'o_power7', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 7 (10 MW, maximum)', kind: 'upgrade', upgrade: 'power', target: 7, reward: 3000 },
-  { id: 'o_battery4', ongoing: true, text: 'Kup čtvrtou baterii', kind: 'upgrade', upgrade: 'battery', target: 4, reward: 2500 },
-  { id: 'o_eff8', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 8', kind: 'upgrade', upgrade: 'efficiency', target: 8, reward: 4000 },
+  // --- Průběžné úkoly (nepovinné, ukážou se po autonomii) ---
+  { id: 'o_eff4', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 4 (plný výkon 10 MW na 6 brigádníků)', kind: 'upgrade', upgrade: 'efficiency', target: 4, reward: 2500 },
+  { id: 'o_worker6', ongoing: true, text: 'Najmi 6 brigádníků (maximum)', kind: 'upgrade', upgrade: 'worker', target: 6, reward: 600 },
+  { id: 'o_power5', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 5 (8 MW)', kind: 'upgrade', upgrade: 'power', target: 5, reward: 1500 },
+  { id: 'dump1', ongoing: true, text: 'Kup mařič přebytku (odvede přebytek v noci)', kind: 'upgrade', upgrade: 'dump', target: 1, reward: 800 },
+  { id: 'battery1', ongoing: true, text: 'Kup první baterii', kind: 'upgrade', upgrade: 'battery', target: 1, reward: 1200 },
+  { id: 'o_eff5', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 5', kind: 'upgrade', upgrade: 'efficiency', target: 5, reward: 3500 },
+  { id: 'o_power6', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 6 (9 MW)', kind: 'upgrade', upgrade: 'power', target: 6, reward: 3000 },
+  { id: 'o_line3', ongoing: true, text: 'Posil dráty a trafo na úroveň 3 (15 MW)', kind: 'upgrade', upgrade: 'line', target: 3, reward: 1500 },
+  { id: 'o_battery2', ongoing: true, text: 'Kup druhou baterii', kind: 'upgrade', upgrade: 'battery', target: 2, reward: 1500 },
   { id: 'o_deliver1000', ongoing: true, text: 'Dodej městu 1000 MWh', kind: 'delivered', target: 1000, reward: 3000 },
-  { id: 'o_eff10', ongoing: true, text: 'Vylepši účinnost spalovny na maximum (úroveň 10)', kind: 'upgrade', upgrade: 'efficiency', target: 10, reward: 8000 },
+  { id: 'o_power7', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 7 (10 MW, maximum)', kind: 'upgrade', upgrade: 'power', target: 7, reward: 5000 },
+  { id: 'o_eff7', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 7', kind: 'upgrade', upgrade: 'efficiency', target: 7, reward: 6000 },
+  { id: 'o_dump2', ongoing: true, text: 'Kup druhý mařič', kind: 'upgrade', upgrade: 'dump', target: 2, reward: 1500 },
+  { id: 'o_eff10', ongoing: true, text: 'Vylepši účinnost spalovny na maximum (úroveň 10)', kind: 'upgrade', upgrade: 'efficiency', target: 10, reward: 12000 },
 ];
+
 
 // ---- Příběh (zatím jen text, postavy a dialogy přijdou v kroku 4) ----
 export const STORY_INTRO =
