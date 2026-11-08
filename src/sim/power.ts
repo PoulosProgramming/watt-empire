@@ -20,6 +20,7 @@ import {
 } from './balance';
 import { baseDemandMW } from './daynight';
 import { incineratorNominalMW, voPerMWh } from './economy';
+import { mainQuestsDone } from './quests';
 import type { GameState } from './state';
 
 export function prestige(s: GameState): number {
@@ -133,7 +134,7 @@ export function runPower(s: GameState, dt: number): void {
   const mwh = toCity * dtH;
   s.delivered += mwh;
   // Krize začne po splnění 15. úkolu a až ve chvíli, kdy je hráč autonomní (nemusí klikat a má z čeho žít)
-  if (s.doneQuests.length >= TOXIC_CRISIS_QUESTS && live.autonomous) s.toxic = true;
+  if (mainQuestsDone(s) >= TOXIC_CRISIS_QUESTS && live.autonomous) s.toxic = true;
   const creditsPerMWh = CREDITS_PER_MWH * (s.toxic ? TOXIC_INCOME_FACTOR : 1);
   s.credits += mwh * creditsPerMWh;
 

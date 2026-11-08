@@ -19,3 +19,8 @@ export function checkQuests(s: GameState): void {
     }
   }
 }
+
+// Počet splněných hlavních úkolů (průběžné se nepočítají do kapitoly ani do spuštění krize)
+export function mainQuestsDone(s: GameState): number {
+  return QUESTS.filter((q) => !q.ongoing && s.doneQuests.includes(q.id)).length;
+}

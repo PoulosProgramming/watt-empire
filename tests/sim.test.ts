@@ -4,6 +4,7 @@ import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '.
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
+import { mainQuestsDone } from '../src/sim/quests';
 import { newGame } from '../src/sim/state';
 
 const run = (s: ReturnType<typeof newGame>, seconds: number) => {
@@ -386,5 +387,31 @@ describe('idle (offline dopočet)', () => {
     const s = newGame();
     s.lastSeen = 123456;
     expect(deserialize(serialize(s))!.lastSeen).toBe(123456);
+  });
+});
+
+describe('průběžné úkoly', () => {
+  it('jsou za hlavními a nepočítají se do hlavních úkolů ani do krize', () => {
+    const firstOngoing = QUESTS.findIndex((q) => q.ongoing);
+    expect(firstOngoing).toBeGreaterThan(TOXIC_CRISIS_QUESTS);
+    expect(QUESTS.slice(firstOngoing).every((q) => q.ongoing)).toBe(true);
+    const s = newGame();
+    s.doneQuests = QUESTS.filter((q) => q.ongoing).map((q) => q.id);
+    expect(mainQuestsDone(s)).toBe(0);
+    s.vo = 100;
+    s.upgrades.worker = 5;
+    s.credits = 100;
+    tick(s);
+    expect(s.toxic).toBe(false);
+  });
+
+  it('průběžný úkol vyplatí odměnu, když je splněn', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.filter((q) => !q.ongoing).map((q) => q.id);
+    s.upgrades.efficiency = 1;
+    const before = s.credits;
+    tick(s);
+    expect(s.doneQuests).toContain('o_eff1');
+    expect(s.credits).toBeGreaterThan(before);
   });
 });

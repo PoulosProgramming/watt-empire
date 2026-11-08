@@ -12,6 +12,7 @@ import {
   INCINERATOR_START_VO,
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
+  ONGOING_QUESTS_VISIBLE,
   QUESTS,
   QUESTS_VISIBLE,
   STORY_CHAPTER_END,
@@ -99,6 +100,9 @@ app.innerHTML = `
 
   <h2>Úkoly</h2>
   <div class="card" id="quests"></div>
+
+  <h2>Průběžné úkoly</h2>
+  <div class="card" id="ongoing"></div>
 
   <details class="card netdetail">
     <summary>🔌 Síť (podrobnosti)</summary>
@@ -312,23 +316,36 @@ function render(): void {
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
 
-  const chapterDone = QUESTS.every((q) => s.doneQuests.includes(q.id));
+  const mainQuests = QUESTS.filter((q) => !q.ongoing);
+  const mainDone = mainQuests.filter((q) => s.doneQuests.includes(q.id)).length;
+  const chapterDone = mainDone === mainQuests.length;
   $('ending').innerHTML = chapterDone
     ? `<div class="card ending"><b>🏁 Konec kapitoly 1</b><p>${STORY_CHAPTER_END}</p></div>`
     : '';
 
-  const open = QUESTS.filter((q) => !s.doneQuests.includes(q.id));
+  const questRow = (q: (typeof QUESTS)[number]) => {
+    const p = Math.min(q.target, questProgress(s, q));
+    return `<div class="row quest"><span>${q.text}</span><span>${fmt(p, 0)}/${q.target} (+${q.reward}💰)</span></div>`;
+  };
+
+  const open = mainQuests.filter((q) => !s.doneQuests.includes(q.id));
   const shown = open.slice(0, QUESTS_VISIBLE);
   $('quests').innerHTML =
-    `<div class="row"><span>Splněno</span><b>${s.doneQuests.length} / ${QUESTS.length}</b></div>` +
-    (s.doneQuests.length < TOXIC_CRISIS_QUESTS ? `<small>Po ${TOXIC_CRISIS_QUESTS}. úkolu přijde ekologická krize.</small>` : '') +
-    shown
-      .map((q) => {
-        const p = Math.min(q.target, questProgress(s, q));
-        return `<div class="row quest"><span>${q.text}</span><span>${fmt(p, 0)}/${q.target} (+${q.reward}💰)</span></div>`;
-      })
-      .join('') +
+    `<div class="row"><span>Splněno</span><b>${mainDone} / ${mainQuests.length}</b></div>` +
+    (mainDone < TOXIC_CRISIS_QUESTS ? `<small>Po ${TOXIC_CRISIS_QUESTS}. úkolu přijde ekologická krize.</small>` : '') +
+    shown.map(questRow).join('') +
     (open.length > shown.length ? `<small>…a ${open.length - shown.length} dalších úkolů se odemkne postupně.</small>` : '');
+
+  // Průběžné úkoly: dál vylepšovat; ukáží se jen ty, jejichž vylepšení už je odemčené
+  const ongoing = QUESTS.filter(
+    (q) => q.ongoing && !s.doneQuests.includes(q.id) && (!q.upgrade || isUnlocked(s, q.upgrade)),
+  );
+  const ongoingDone = QUESTS.filter((q) => q.ongoing && s.doneQuests.includes(q.id)).length;
+  const ongoingTotal = QUESTS.filter((q) => q.ongoing).length;
+  $('ongoing').innerHTML = ongoing.length
+    ? `<div class="row"><span>Splněno</span><b>${ongoingDone} / ${ongoingTotal}</b></div>` +
+      ongoing.slice(0, ONGOING_QUESTS_VISIBLE).map(questRow).join('')
+    : `<div class="row"><span>Splněno</span><b>${ongoingDone} / ${ongoingTotal}</b></div>`;
 }
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce
