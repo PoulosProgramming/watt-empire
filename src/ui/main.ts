@@ -5,6 +5,8 @@ import {
   DEBUG_SPEEDS,
   EFFICIENCY_VO_FACTOR,
   INCINERATOR_VO_PER_MWH,
+  OFFLINE_FULL_RATE_SECONDS,
+  OFFLINE_REDUCED_RATE,
   SECONDS_PER_GAME_HOUR,
   INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
@@ -143,10 +145,12 @@ function runOffline(): void {
   state.lastSeen = Date.now();
   const r = simulateOffline(state, elapsed);
   if (!r) return;
-  const min = Math.max(1, Math.round(r.seconds / 60));
+  const totalMin = Math.max(1, Math.round(r.seconds / 60));
+  const away = totalMin >= 60 ? `${Math.floor(totalMin / 60)} h ${totalMin % 60} min` : `${totalMin} min`;
   const vo = r.vo >= 0 ? `+${fmt(r.vo, 0)}` : `−${fmt(Math.abs(r.vo), 0)}`;
   showToast(
-    `🌙 <b>Zatímco jsi byl pryč (${min} min)</b><br>` +
+    `🌙 <b>Zatímco jsi byl pryč (${away})</b><br>` +
+      (r.seconds > OFFLINE_FULL_RATE_SECONDS ? `<small>První ${Math.round(OFFLINE_FULL_RATE_SECONDS / 60)} min na plno, zbytek jen na ${Math.round(OFFLINE_REDUCED_RATE * 100)} %.</small><br>` : '') +
       `💰 ${r.credits >= 0 ? '+' : '−'}${fmt(Math.abs(r.credits), 0)}, ⚡ ${fmt(r.delivered)} MWh dodáno, ♻️ ${vo} VO` +
       (r.blackouts > 0 ? `<br>⚫ ${r.blackouts}× vypadla síť` : ''),
   );

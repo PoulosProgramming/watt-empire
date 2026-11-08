@@ -127,7 +127,9 @@ export const STORY_CHAPTER_END =
 export const TOAST_SECONDS = 7; // jak dlouho je vidět oznámení o splněném úkolu
 
 // ---- Idle (dopočet času, kdy hráč nehrál) ----
-export const OFFLINE_MAX_SECONDS = 1800; // nejvýš 30 minut se dopočítá
+export const OFFLINE_MAX_SECONDS = 86400; // nejvýš 24 hodin se dopočítá
+export const OFFLINE_FULL_RATE_SECONDS = 1800; // prvních 30 minut pauzy se počítá na plnou rychlost
+export const OFFLINE_REDUCED_RATE = 0.05; // zbytek pauzy jen na 5 % rychlosti (ať se hra nepřeskočí spánkem)
 export const OFFLINE_MIN_SECONDS = 15; // kratší pauza se nepočítá
 export const OFFLINE_STEP_SECONDS = 1; // dopočet po větších krocích (rychlejší než 4× za sekundu)
 

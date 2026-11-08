@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
+import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
@@ -339,10 +339,24 @@ describe('idle (offline dopočet)', () => {
     expect(s.credits).toBe(100);
   });
 
-  it('dopočet je omezený horním limitem', () => {
+  it('dopočet je omezený horním limitem 24 hodin', () => {
     const s = autonomous();
     const r = simulateOffline(s, 10 * OFFLINE_MAX_SECONDS)!;
     expect(r.seconds).toBe(OFFLINE_MAX_SECONDS);
+  });
+
+  it('po prvních 30 minutách se počítá jen zlomek (hodina ≈ 1,05× půl hodiny)', () => {
+    const half = simulateOffline(autonomous(), 1800)!;
+    const hour = simulateOffline(autonomous(), 3600)!;
+    expect(half.playedSeconds).toBe(1800);
+    expect(hour.playedSeconds).toBeCloseTo(1800 + 1800 * OFFLINE_REDUCED_RATE, 5);
+    expect(hour.delivered / half.delivered).toBeLessThan(1.2);
+    expect(hour.delivered).toBeGreaterThan(half.delivered);
+  });
+
+  it('celý den (24 h) vyjde výrazně méně než 24 h plné hry', () => {
+    const day = simulateOffline(autonomous(), OFFLINE_MAX_SECONDS)!;
+    expect(day.playedSeconds).toBeLessThan(OFFLINE_MAX_SECONDS * 0.1);
   });
 
   it('bez brigádníků dojde odpad a výroba se zastaví', () => {
