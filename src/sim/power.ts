@@ -3,6 +3,7 @@ import {
   BATTERY_RATE_PER_LEVEL_MW,
   BLACKOUT_FEE,
   BLACKOUT_SECONDS,
+  CONTRACT_MW,
   CREDITS_PER_MWH,
   DEMAND_PER_PRESTIGE,
   DUMP_COST_PER_MWH,
@@ -17,7 +18,6 @@ import {
   SECONDS_PER_GAME_HOUR,
   TOXIC_INCOME_FACTOR,
 } from './balance';
-import { baseDemandMW } from './daynight';
 import { incineratorNominalMW, voPerMWh } from './economy';
 import type { GameState } from './state';
 
@@ -34,20 +34,14 @@ export { incineratorNominalMW };
 export const dumpCapacityMW = (s: GameState) => s.upgrades.dump * DUMP_MW_PER_LEVEL;
 export const batteryCapacityMWh = (s: GameState) => s.upgrades.battery * BATTERY_CAPACITY_PER_LEVEL_MWH;
 export const batteryRateMW = (s: GameState) => s.upgrades.battery * BATTERY_RATE_PER_LEVEL_MW;
-export const cityDemandMW = (s: GameState) =>
-  baseDemandMW(s.hour) * (1 + (prestige(s) - 1) * DEMAND_PER_PRESTIGE);
+// Smlouva: město odebírá stálých CONTRACT_MW bez ohledu na den a noc (den a noc je zatím jen vizuální).
+// Prestiž zvedá odběr až po konci kapitoly 1 (prestiž 2 je od 500 MWh).
+export const cityDemandMW = (s: GameState) => CONTRACT_MW * (1 + (prestige(s) - 1) * DEMAND_PER_PRESTIGE);
 
 // Nejnižší a nejvyšší odběr města během dne (MW), aby hráč věděl, kolik energie město vůbec vezme.
 export function cityDemandRangeMW(s: GameState): { min: number; max: number } {
-  const mult = 1 + (prestige(s) - 1) * DEMAND_PER_PRESTIGE;
-  let min = Infinity;
-  let max = 0;
-  for (let h = 0; h < 24; h += 0.25) {
-    const d = baseDemandMW(h) * mult;
-    min = Math.min(min, d);
-    max = Math.max(max, d);
-  }
-  return { min, max };
+  const d = cityDemandMW(s);
+  return { min: d, max: d };
 }
 
 // Jednoduchá síť: výroba -> (baterie) -> vedení -> město.
@@ -127,6 +121,9 @@ export function runPower(s: GameState, dt: number): void {
   }
   let wasted = Math.max(0, production - Math.min(production, demand, line) - Math.max(0, battery));
   s.battery = Math.min(batteryCapacityMWh(s), Math.max(0, s.battery + battery * dtH));
+
+  // Smlouva je splněna, když město aspoň jednou dostane smluvní výkon
+  if (toCity >= CONTRACT_MW - 1e-6) s.contractMet = true;
 
   // 3) Dodaná energie = peníze
   const mwh = toCity * dtH;

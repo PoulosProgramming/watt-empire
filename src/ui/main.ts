@@ -13,6 +13,7 @@ import {
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
   ONGOING_QUESTS_VISIBLE,
+  CHAPTER1_END_QUESTS,
   ONGOING_UNLOCK_QUEST,
   QUESTS,
   QUESTS_VISIBLE,
@@ -82,7 +83,7 @@ app.innerHTML = `
     <summary>❓ Jak na to</summary>
     <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
     <p>Začni klepáním na odpad, pak najmi brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
-    <p>Za kredity zvyšuj <b>výkon</b>. Pozor: <b>v noci město bere málo</b>. Přebytek pak odvede 🔥 mařič (stojí peníze) nebo ho uloží 🔋 baterie. Když se přebytek nevejde nikam, síť se přetíží a přijde ⚫ blackout.</p>
+    <p>Máš <b>smlouvu na stálých 15 MW</b>, den i noc. Za kredity zvyšuj <b>výkon</b> spalovny a vedení (dráty a trafo), ať městu dodáš celých 15 MW. Pozor: vedení musí unést tvůj výkon, jinak se síť přetíží a přijde ⚫ blackout.</p>
   </details>
   <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
 
@@ -284,7 +285,7 @@ function render(): void {
     <div class="row"><span>Čas</span><b>Den ${s.day}, ${hh}:${mm} ${dayNight}</b></div>
     <div class="row"><span>Prestiž města</span><b>${prestige(s)}</b></div>
     <div class="row"><span>Spotřeba města</span><b>${fmt(l.demandMW)} MW</b></div>
-    <div class="row"><span>Rozsah spotřeby</span><b>${fmt(range.min)} (noc) – ${fmt(range.max)} MW (poledne)</b></div>
+    <div class="row"><span>Smlouva (stálý odběr)</span><b>${fmt(range.max)} MW, den i noc</b></div>
     <div class="row"><span>Výroba</span><b>${fmt(l.productionMW)} MW</b></div>
     <div class="row"><span>Dodáváme</span><b>${fmt(l.deliveredMW)} / ${lineCapacityMW(s)} MW (vedení)</b></div>
     <div class="row"><span>Baterie</span><b>${fmt(s.battery)} / ${bcap} MWh ${l.batteryFlowMW > 0.01 ? '⬆' : l.batteryFlowMW < -0.01 ? '⬇' : ''}</b></div>
@@ -322,10 +323,9 @@ function render(): void {
     let desc = def.description;
     if (def.id === 'power' && !max) {
       const next = incineratorNominalMW(s) + INCINERATOR_POWER_STEP_MW;
-      if (next > range.max) desc = `⚠️ Po koupi ${next} MW, ale město vezme nejvýš ${fmt(range.max)} MW. Zbytek by se zbytečně pálil.`;
-      else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty.`;
-      else if (next > range.min) desc = `Po koupi ${next} MW. Město v noci bere jen ${fmt(range.min)} MW, přebytek ${fmt(next - range.min)} MW pak potřebuje mařič nebo baterii.`;
-      else desc = `Po koupi ${next} MW. Město ho vždy vezme (v noci aspoň ${fmt(range.min)} MW).`;
+      if (next > range.max) desc = `⚠️ Po koupi ${next} MW, ale město odebere jen ${fmt(range.max)} MW (smlouva).`;
+      else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty a trafo.`;
+      else desc = `Po koupi ${next} MW z ${fmt(range.max)} MW smluvních.`;
     }
     if (def.id === 'efficiency' && !max) {
       const now = (incineratorNominalMW(s) * s.incineratorLevel / SECONDS_PER_GAME_HOUR) * voPerMWh(s, INCINERATOR_VO_PER_MWH);
@@ -336,7 +336,7 @@ function render(): void {
 
   const mainQuests = QUESTS.filter((q) => !q.ongoing);
   const mainDone = mainQuests.filter((q) => s.doneQuests.includes(q.id)).length;
-  const chapterDone = mainDone === mainQuests.length;
+  const chapterDone = CHAPTER1_END_QUESTS.every((id) => s.doneQuests.includes(id));
   $('ending').innerHTML = chapterDone
     ? `<div class="card ending"><b>🏁 Konec kapitoly 1</b><p>${STORY_CHAPTER_END}</p></div>`
     : '';

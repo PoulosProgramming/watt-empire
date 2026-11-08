@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
+import { CHAPTER1_END_QUESTS, CONTRACT_MW, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { runCrisis } from '../src/sim/quests';
@@ -207,14 +207,13 @@ describe('spalovna', () => {
 
   it('automatický regulátor drží výkon podle spotřeby a blokuje ruční změnu', () => {
     const s = newGame();
-    s.hour = 20; // noc, spotřeba 7 MW
     s.upgrades.power = 7; // 10 MW
-    s.upgrades.line = 1; // vedení 9 MW
+    s.upgrades.line = 1; // vedení 9 MW, smlouva 15 MW => regulátor drží 9 MW = 90 % výkonu
     s.upgrades.regulator = 1;
     s.vo = 10000;
     s.credits = 100;
     run(s, 5);
-    expect(s.incineratorLevel).toBeCloseTo(0.7, 5);
+    expect(s.incineratorLevel).toBeCloseTo(0.9, 5);
     expect(s.blackout).toBe(0);
   });
 });
@@ -264,28 +263,76 @@ describe('odemykání', () => {
     expect(buyUpgrade(s, 'worker')).toBe(true);
   });
 
-  it('mařič se odemkne až po výkonu spalovny 4, regulátor po 250 MWh', () => {
+  it('mařič a baterie se odemknou až v kapitole 3, regulátor v kapitole 4', () => {
     const s = newGame();
+    s.upgrades.power = 12;
+    s.delivered = 5000;
     expect(isUnlocked(s, 'dump')).toBe(false);
-    s.upgrades.power = 3;
-    expect(isUnlocked(s, 'dump')).toBe(false);
-    s.upgrades.power = 4;
+    expect(isUnlocked(s, 'battery')).toBe(false);
+    expect(isUnlocked(s, 'regulator')).toBe(false);
+    s.chapter = 3;
     expect(isUnlocked(s, 'dump')).toBe(true);
     expect(isUnlocked(s, 'battery')).toBe(true);
     expect(isUnlocked(s, 'regulator')).toBe(false);
-    s.delivered = 250;
+    s.chapter = 4;
     expect(isUnlocked(s, 'regulator')).toBe(true);
   });
 });
 
-describe('rozsah spotřeby města', () => {
-  it('na začátku je 7 až 14 MW a s prestiží roste', () => {
+describe('smlouva na stálých 15 MW', () => {
+  it('odběr města je stálý, den i noc, a nezávisí na hodině', () => {
     const s = newGame();
     const r = cityDemandRangeMW(s);
-    expect(r.min).toBeCloseTo(7, 5);
-    expect(r.max).toBeCloseTo(14, 1);
+    expect(r.min).toBeCloseTo(CONTRACT_MW, 5);
+    expect(r.max).toBeCloseTo(CONTRACT_MW, 5);
+    for (const h of [3, 8, 12, 20]) {
+      s.hour = h;
+      tick(s);
+      expect(s.live.demandMW).toBeCloseTo(CONTRACT_MW, 5);
+    }
+  });
+
+  it('prestiž zvedá odběr až po konci kapitoly (500 MWh)', () => {
+    const s = newGame();
     s.delivered = 500; // prestiž 2
-    expect(cityDemandRangeMW(s).min).toBeCloseTo(7 * 1.25, 5);
+    expect(cityDemandRangeMW(s).max).toBeCloseTo(CONTRACT_MW * 1.25, 5);
+  });
+
+  it('smlouva se splní, když město aspoň jednou dostane 15 MW', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== 'contract');
+    s.upgrades.power = 12; // 15 MW
+    s.upgrades.line = 3; // vedení 15 MW
+    s.vo = 1000;
+    expect(s.contractMet).toBe(false);
+    tick(s);
+    expect(s.live.deliveredMW).toBeCloseTo(CONTRACT_MW, 5);
+    expect(s.contractMet).toBe(true);
+    expect(s.doneQuests).toContain('contract');
+  });
+
+  it('s vedením pro 12 MW se smlouva (15 MW) nesplní', () => {
+    const s = newGame();
+    s.upgrades.power = 12;
+    s.upgrades.line = 2; // 12 MW
+    s.vo = 1000;
+    tick(s);
+    expect(s.contractMet).toBe(false);
+  });
+
+  it('kapitola 1 končí smlouvou a 500 MWh, ne jen jedním z toho', () => {
+    expect(CHAPTER1_END_QUESTS).toEqual(['contract', 'deliver400']);
+    const contract = QUESTS.find((q) => q.id === 'contract')!;
+    const mwh = QUESTS.find((q) => q.id === 'deliver400')!;
+    expect(contract.kind).toBe('contract');
+    expect(mwh.target).toBe(500);
+  });
+
+  it('15 MW jde dosáhnout: výkon max 12 úrovní a vedení 3 úrovně stačí', () => {
+    const power = UPGRADES.find((u) => u.id === 'power')!;
+    const line = UPGRADES.find((u) => u.id === 'line')!;
+    expect(3 + power.maxLevel).toBeGreaterThanOrEqual(CONTRACT_MW);
+    expect(6 + 3 * line.maxLevel).toBeGreaterThanOrEqual(CONTRACT_MW);
   });
 });
 

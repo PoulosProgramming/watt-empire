@@ -29,8 +29,11 @@ export const EFFICIENCY_VO_FACTOR = 0.9; // každé vylepšení účinnosti: VO 
 
 // ---- Město a síť ----
 export const CREDITS_PER_MWH = 10; // 1 MWh dodaná městu = 10 kreditů (GDD)
-export const CITY_BASE_DEMAND_MW = 14; // špička spotřeby ve dne
-export const CITY_NIGHT_FACTOR = 0.5; // v noci spotřeba klesne na 50 % (7 MW)
+// Smlouva (kapitola 1): město odebírá stálých CONTRACT_MW bez ohledu na den a noc. Den a noc je zatím jen vizuální;
+// v části hry, která není domyšlená, přijde zlom, kdy bude potřeba regulovat (pak se použije křivka níž).
+export const CONTRACT_MW = 15;
+export const CITY_BASE_DEMAND_MW = 14; // špička spotřeby ve dne (křivka dne a noci se zatím nepoužívá)
+export const CITY_NIGHT_FACTOR = 0.5; // v noci spotřeba klesne na 50 % (zatím se nepoužívá)
 export const DEMAND_PER_PRESTIGE = 0.25; // každá úroveň prestiže +25 % spotřeby
 export const LINE_BASE_CAPACITY_MW = 6; // propustnost drátů a trafa na začátku
 export const LINE_UPGRADE_MW = 3;
@@ -65,9 +68,9 @@ export const PRESTIGE_THRESHOLDS_MWH = [0, 500, 1200, 2800, 6500];
 // ---- Vylepšení ----
 export type UpgradeId = 'worker' | 'power' | 'efficiency' | 'line' | 'battery' | 'dump' | 'regulator';
 
-// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu)
+// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu) | smlouva (dosažení smluvních MW) | kapitola
 export interface Requirement {
-  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy';
+  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter';
   target: number;
   upgrade?: UpgradeId; // jen pro kind 'upgrade'
 }
@@ -86,12 +89,12 @@ export interface UpgradeDef {
 // Brigádníci: v kapitole 1 stačí 6 (2,4 VO/s = plný výkon 10 MW při účinnosti spalovny aspoň 4). Víc je pro pozdější kapitoly.
 export const UPGRADES: UpgradeDef[] = [
   { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 175, growth: 1.3, maxLevel: 6, unlock: { kind: 'upgrade', upgrade: 'power', target: 1, text: 'po prvním upgradu výkonu spalovny' } },
-  { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz, ale v noci hrozí přebytek)', baseCost: 300, growth: 1.8, maxLevel: 7, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' }, group: 'incinerator' },
+  { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz za dodanou energii)', baseCost: 300, growth: 1.28, maxLevel: 12, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' }, group: 'incinerator' },
   { id: 'efficiency', name: 'Účinnost spalovny', description: 'Stejný výkon za méně VO (−10 % spotřeby odpadu)', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' }, group: 'incinerator' },
   { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
-  { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'upgrade', upgrade: 'power', target: 4, text: 'po výkonu spalovny 7 MW (od 8 MW vzniká noční přebytek)' } },
-  { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 4, text: 'po výkonu spalovny 7 MW (od 8 MW vzniká noční přebytek)' } },
-  { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1, unlock: { kind: 'delivered', target: 250, text: 'po dodání 250 MWh' }, group: 'incinerator' },
+  { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'chapter', target: 3, text: 'v kapitole 3 (až bude přebytek z obnovitelných zdrojů)' } },
+  { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'chapter', target: 3, text: 'v kapitole 3 (s obnovitelnými zdroji)' } },
+  { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1, unlock: { kind: 'chapter', target: 4, text: 'v kapitole 4 (regulace)' }, group: 'incinerator' },
 ];
 
 // ---- Úkoly (zatím bez postav) ----
@@ -120,35 +123,34 @@ export const QUESTS: QuestDef[] = [
   { id: 'line1', text: 'Posil dráty a trafo (kvůli výkonu nad 6 MW)', kind: 'upgrade', upgrade: 'line', target: 1, reward: 300 },
   { id: 'autonomy', text: 'Dosáhni autonomie: brigádníci zásobí spalovnu odpadem, nemusíš klikat', kind: 'autonomy', target: 1, reward: 400 },
   { id: 'eff2', text: 'Vylepši účinnost spalovny na úroveň 2', kind: 'upgrade', upgrade: 'efficiency', target: 2, reward: 900 },
-  { id: 'power4', text: 'Zvyš výkon spalovny na úroveň 4 (7 MW, tolik město bere v noci)', kind: 'upgrade', upgrade: 'power', target: 4, reward: 350 },
+  { id: 'power4', text: 'Zvyš výkon spalovny na úroveň 4 (7 MW)', kind: 'upgrade', upgrade: 'power', target: 4, reward: 350 },
   { id: 'deliver100', text: 'Dodej městu 100 MWh', kind: 'delivered', target: 100, reward: 600 },
   { id: 'eff3', text: 'Vylepši účinnost spalovny na úroveň 3', kind: 'upgrade', upgrade: 'efficiency', target: 3, reward: 1500 },
   { id: 'line2', text: 'Posil dráty a trafo na úroveň 2 (12 MW)', kind: 'upgrade', upgrade: 'line', target: 2, reward: 800 },
-  // --- Po ekologické krizi ---
+  // --- Finále kapitoly 1: smlouva na stálých 15 MW ---
+  { id: 'power8', text: 'Zvyš výkon spalovny na úroveň 8 (11 MW)', kind: 'upgrade', upgrade: 'power', target: 8, reward: 800 },
   { id: 'deliver250', text: 'Dodej městu 350 MWh', kind: 'delivered', target: 350, reward: 1000 },
-  { id: 'regulator', text: 'Kup automatický regulátor', kind: 'upgrade', upgrade: 'regulator', target: 1, reward: 1500 },
+  { id: 'line3', text: 'Posil dráty a trafo na úroveň 3 (15 MW, vedení unese smluvní dodávku)', kind: 'upgrade', upgrade: 'line', target: 3, reward: 1000 },
+  { id: 'power12', text: 'Zvyš výkon spalovny na úroveň 12 (15 MW, smluvní výkon)', kind: 'upgrade', upgrade: 'power', target: 12, reward: 1500 },
+  { id: 'contract', text: 'Splň smlouvu: dodej městu 15 MW', kind: 'contract', target: 1, reward: 5000 },
   { id: 'deliver400', text: 'Dodej městu 500 MWh (konec kapitoly 1)', kind: 'delivered', target: 500, reward: 2000 },
   // --- Průběžné úkoly (nepovinné, ukážou se po autonomii) ---
   { id: 'o_eff4', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 4 (plný výkon 10 MW na 6 brigádníků)', kind: 'upgrade', upgrade: 'efficiency', target: 4, reward: 2500 },
   { id: 'o_worker6', ongoing: true, text: 'Najmi 6 brigádníků (maximum)', kind: 'upgrade', upgrade: 'worker', target: 6, reward: 600 },
-  { id: 'o_power5', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 5 (8 MW)', kind: 'upgrade', upgrade: 'power', target: 5, reward: 1500 },
-  { id: 'dump1', ongoing: true, text: 'Kup mařič přebytku (odvede přebytek v noci)', kind: 'upgrade', upgrade: 'dump', target: 1, reward: 800 },
-  { id: 'battery1', ongoing: true, text: 'Kup první baterii', kind: 'upgrade', upgrade: 'battery', target: 1, reward: 1200 },
   { id: 'o_eff5', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 5', kind: 'upgrade', upgrade: 'efficiency', target: 5, reward: 3500 },
-  { id: 'o_power6', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 6 (9 MW)', kind: 'upgrade', upgrade: 'power', target: 6, reward: 3000 },
-  { id: 'o_line3', ongoing: true, text: 'Posil dráty a trafo na úroveň 3 (15 MW)', kind: 'upgrade', upgrade: 'line', target: 3, reward: 1500 },
-  { id: 'o_battery2', ongoing: true, text: 'Kup druhou baterii', kind: 'upgrade', upgrade: 'battery', target: 2, reward: 1500 },
   { id: 'o_deliver1000', ongoing: true, text: 'Dodej městu 1000 MWh', kind: 'delivered', target: 1000, reward: 3000 },
-  { id: 'o_power7', ongoing: true, text: 'Zvyš výkon spalovny na úroveň 7 (10 MW, maximum)', kind: 'upgrade', upgrade: 'power', target: 7, reward: 5000 },
   { id: 'o_eff7', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 7', kind: 'upgrade', upgrade: 'efficiency', target: 7, reward: 6000 },
-  { id: 'o_dump2', ongoing: true, text: 'Kup druhý mařič', kind: 'upgrade', upgrade: 'dump', target: 2, reward: 1500 },
+  { id: 'o_deliver2000', ongoing: true, text: 'Dodej městu 2000 MWh', kind: 'delivered', target: 2000, reward: 6000 },
   { id: 'o_eff10', ongoing: true, text: 'Vylepši účinnost spalovny na maximum (úroveň 10)', kind: 'upgrade', upgrade: 'efficiency', target: 10, reward: 12000 },
 ];
 
 
+// Kapitola 1 končí, když je splněna smlouva (15 MW) A zároveň dodáno aspoň CHAPTER1_END_MWH.
+export const CHAPTER1_END_QUESTS = ['contract', 'deliver400']; // smlouva a 500 MWh
+
 // ---- Příběh (zatím jen text, postavy a dialogy přijdou v kroku 4) ----
 export const STORY_INTRO =
-  'Zamořený ostrov. Jediná věc, která tu ještě funguje, je stará spalovna odpadu. Městečko za kopcem je bez proudu a starosta tě prosí: roztoč spalovnu, vyčisti pláž a dodej městu elektřinu, než zhasne naposledy.';
+  'Zamořený ostrov. Jediná věc, která tu ještě funguje, je stará spalovna odpadu. Městečko za kopcem je bez proudu a starosta tě prosí: roztoč spalovnu a dodej městu elektřinu. Nasmlouvali jste stálou dodávku 15 MW, den i noc. Zatím máš jen zlomek, tak začni.';
 export const STORY_CHAPTER_END =
   'Město svítí a ostrov dýchá. Regulátor drží síť sám a tobě zbývá jen hlídat peníze. Jenže stará spalovna pálí odpad dál a pod hladinou se probouzí něco většího. Konec kapitoly 1. V kapitole 2 přijde laboratoř, likvidátor odpadu a první soláry. Zatím jde hra dál ladit: dohraj poslední úkoly a pošli, co ti vadilo.';
 

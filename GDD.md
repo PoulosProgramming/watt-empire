@@ -23,7 +23,7 @@ Hráč začíná na zamořeném ostrově s jedinou starou spalovnou odpadu. Cíl
 Od běžných klikaček se hra liší tím, že ekonomika nutí hráče optimalizovat síť, ne jen klikat.
 
 - **Výroba = spotřeba:** hráč balancuje výrobu s aktuální spotřebou města, přebytky musí ukládat.
-- **Den a noc:** 1 herní den = 6 reálných minut (3 min den, 3 min noc). V noci klesá spotřeba; bez baterií síť přetíží a hráč platí postihy.
+- **Den a noc:** 1 herní den = 6 reálných minut (3 min den, 3 min noc). **Zpočátku jen vizuální** (město odebírá stálou smluvní dodávku). Až přijde zlom, kdy bude potřeba regulovat (zatím nedomyšlené), začne spotřeba v noci klesat; bez uložení přebytků pak síť přetíží a hráč platí postihy.
 - **Fyzikální limity sítě:** vedení a transformátory mají maximální propustnost v MW. Při přetížení síť vypadne a nahození stojí poplatek.
 - **Toxický odpad:** špinavé technologie produkují toxický odpad, který blokuje mapu, snižuje prestiž a jeho likvidace je drahá.
 - **Aktivní i pasivní hraní:** merge minihra a ruční klikání, nebo běh na pozadí s brigádníky.
@@ -31,29 +31,41 @@ Od běžných klikaček se hra liší tím, že ekonomika nutí hráče optimali
 
 ## 4. Průchod hrou
 
-Hra má tři kapitoly; každou odemyká dodaná energie a s ní prestiž města.
+Hra má **pět kapitol**, každou odemyká splnění cíle předchozí. Vše je hezky odstupňované: nové technologie se odemykají postupně (hlavní úkoly odemykají technologie a dávají důležité bonusy).
 
-### Kapitola 1: Spalovna a start
+### Kapitola 1: Smlouva na stálých 15 MW
+
+Hráč je spalovna, která zásobuje ostrov. Má **nasmlouvanou dodávku 15 MW, kterou musí městu dávat stabilně, bez ohledu na den a noc**. To je hlavní bod kapitoly: začít vyrábět stabilně a dodat městu smluvních 15 MW.
 
 - **Mapa:** mřížka cca 20×20, viditelná jen malá část, odpadky na zemi. Uprostřed spalovna (2×2), dráty vedou do trafa města v pravém dolním rohu.
-- **Ekonomika:** 5 tapů na odpad = 5 vytříděného odpadu (VO). 5 VO ve spalovně = 1 MWh (výkonem 10 MW). 1 MWh dodaná městu = 10 kreditů.
-- **Vylepšení:** brigádníci (automatický sběr), účinnost spalovny, kapacita drátů a trafa, první baterie (nutné pro noc).
-- **Krize:** na konci kapitoly 1 se ve zprávě naznačí hrozba; samotná krize (spalovna vyplivne toxický odpad 2×2, příjmy města klesnou) přijde na začátku kapitoly 2.
-- **Úkoly místo tutoriálu:** dodej 1 MWh, vyčisti 5 políček, dodej 100 MWh.
+- **Ekonomika:** 5 tapů na odpad = 5 vytříděného odpadu (VO). 5 VO ve spalovně = 1 MWh. 1 MWh dodaná městu = 10 kreditů. Spalovna začíná na 3 MW, výkon se zvyšuje nákupem (až na 15 MW).
+- **Vylepšení:** brigádníci (automatický sběr, max 6), výkon a účinnost spalovny, kapacita drátů a trafa (nutná pro výkon nad 6 MW).
+- **Bez regulace:** čím víc hráč vyrábí, tím víc město odebírá (až do smluvních 15 MW). Regulátor, baterie ani mařič v kapitole 1 nejsou.
+- **Úkoly místo tutoriálu**, hlavní úkoly odemykají technologie a dávají bonusy; průběžné úkoly (po autonomii) dávají peníze za další vylepšování.
+- **Konec kapitoly:** splněná smlouva (město **aspoň jednou** dostalo 15 MW) **a zároveň** dodáno 500 MWh. Na konci se ve zprávě naznačí hrozba.
 
-### Kapitola 2: Laboratoř, merge a soláry
+### Kapitola 2: Odpad a krize
 
-Odemyká se po dodání 500 MWh (prestiž města 2; původně 100, zvýšeno po testu tempa).
+Přijde problém: **odpad ze spalovny**. Lidé se bouří, město platí méně (nechce „špinavou energii").
 
-- **Výzkum (merge minihra):** laboratoř generuje zkumavky, spojováním (1+1=2, 2+2=4) vznikají silnější bloky.
-- **Likvidátor odpadu:** první produkt výzkumu, za poplatek trvale ničí toxický odpad.
-- **Solární panely (FVE):** modulární panely 1×1 lze lepit k sobě, fungují jen přes střídač s trafem a jen ve dne. Vytváří velké polední špičky; v noci dál drží síť spalovna.
-- **E-odpad:** výstavba produkuje křemík, který lze recyklovat na VO.
+- Hráč začne odpad **likvidovat a rozebírat** (v budoucnu merge minihra), pak ho **uskladňovat a nevyhazovat na pole**.
+- **Regulace stále není potřeba:** čím víc se vyrábí, tím víc město odebírá, byť za snížený poplatek.
+- Ekologická katastrofa (toxický odpad 2×2 na mapě, velký popup, příjem 60 %) je v kódu nachystaná, spouští se až tady.
 
-### Kapitola 3: Biomy a obnovitelné zdroje
+### Kapitola 3: Čistý zdroj a obnovitelné zdroje
 
-- **Hory:** v mlze je rozbitá přehrada. Hráč kupuje parcely, dostane se k ní a vyzkoumá opravu. Vyrábí 24/7, ale potřebuje drahé vedení vysokého napětí.
-- **Oceán:** offshore větrné elektrárny vyrábí 24/7, ale výkon náhodně a drasticky kolísá. Extrémní nápor na baterie a balancování sítě.
+- **Úkol:** přesvědčit veřejnost, že jsme čistý zdroj.
+- Vytříděný toxický odpad něco stojí a začne zabírat vzácnou hrací plochu; vyčistit ji stojí hodně peněz.
+- **Odemykají se obnovitelné zdroje (OZE):** soláry (panely 1×1 lepené k sobě, přes střídač s trafem, jen ve dne), hory (rozbitá přehrada, vyrábí 24/7, drahé vysoké napětí) a oceán (offshore vítr, výkon kolísá).
+- Odemykají se také **baterie** a **mařič přebytku** (s OZE vznikají přebytky).
+
+### Kapitola 4: Regulace
+
+- Odemyká se **regulace** (automatický regulátor). Zde přijde velký zlom: den a noc začnou hrát roli a hráč musí síť regulovat (podrobnosti zatím nedomyšlené).
+
+### Kapitola 5: Jaderné elektrárny
+
+- Odemykají se **jaderky**. Podrobnosti zatím nedomyšlené.
 
 ## 5. Metahra inspirovaná TSTO
 
@@ -126,8 +138,8 @@ Nejdřív ověřit, že je jádro zábavné bez grafiky, a teprve pak stavět ma
 3. **Mapa a stavění:** mřížka v Phaseru, posun a zoom, stavění budov a drátů, mlha a parcely.
 4. **Kapitola 1 komplet + TSTO MVP:** toxický odpad, úkoly s postavami, rostoucí město.
 5. **Uložení a mobil:** save, offline progres, PWA, ladění dotyků na telefonu.
-6. **Kapitola 2:** laboratoř a merge, likvidátor, soláry se střídačem. Pak dekorace a časové mise.
-7. **Kapitola 3:** biomy, přehrada, offshore vítr.
+6. **Kapitola 2:** odpad a krize, likvidace a rozebírání odpadu (merge minihra), uskladnění. Pak dekorace a časové mise.
+7. **Kapitoly 3 až 5:** OZE (soláry, hory, oceán) a čistý zdroj; regulace; jaderky.
 
 ### Rizika a jak je vyladit
 
@@ -152,20 +164,19 @@ Z prvního hraní na mobilu (kroky 4 a dál):
 - **Sběr na mapě** má být omezený (odpad se objevuje s limitem), aby nešlo hru dohrát rychlým klikáním; ceny brigádníků pak přeladit.
 - **Tutoriál s postavami** místo textové nápovědy.
 
-### Návrh přestavby kapitol (8. 11. 2026, ČEKÁ NA ODSOUHLASENÍ, zatím nic z toho není v kódu ani v sekci 4)
+### Rozhodnutí o přestavbě kapitol (8. 11. 2026)
 
-Nápad od autora, uložený tak, jak byl řečen. **Nepřepisuje žádné dosavadní rozhodnutí**, jen je doplňuje. Rozpory jsou vypsané dole.
+Autor schválil pětikapitolovou strukturu (sekce 4). Rozhodnuto takto:
+1. **Pět kapitol** (smlouva 15 MW, odpad a krize, čistý zdroj a OZE, regulace, jaderky). Původní tři kapitoly jsou níž jako nápady do budoucna.
+2. **Soláry patří k OZE do kapitoly 3.**
+3. **Den a noc je zpočátku jen vizuální**, dodává se smluvně; později přijde zlom, kdy bude nutné regulovat (nedomyšleno).
+4. **Mařič, baterie a regulátor se zamykají do pozdějších kapitol** (baterie a mařič kapitola 3, regulátor kapitola 4); v kapitole 1 nejsou.
+5. **Konec kapitoly 1:** splněná smlouva a zároveň 500 MWh. Smlouva se splní **jednou** dosažením 15 MW.
 
-- **Kapitola 1 (finále):** hráč je spalovna, která zásobuje ostrov. Má **nasmlouvanou dodávku (např. 15 MW), kterou musí městu dávat stabilně, bez ohledu na den a noc.** Hlavní bod kapitoly: začít vyrábět stabilně a dodávat smluvních 15 MW. Regulace tu není potřeba.
-- **Kapitola 2 (problém):** odpad ze spalovny, lidé se bouří, město platí méně (nechce „špinavou energii"). Hráč začne odpad likvidovat a rozebírat (v budoucnu merge minihra), pak ho uskladňovat a nevyhazovat na pole. Regulace stále není potřeba: čím víc hráč vyrábí, tím víc město odebírá, byť za snížený poplatek.
-- **Kapitola 3:** úkolem je přesvědčit veřejnost, že jsme čistý zdroj. Vytříděný toxický odpad něco stojí a zabírá vzácnou hrací plochu; vyčistit ji stojí hodně peněz. **Odemknou se obnovitelné zdroje (OZE).**
-- **Kapitola 4:** **regulace** (odemkne se až tady).
-- **Kapitola 5:** **jaderné elektrárny.**
-- Vše má být hezky odstupňované.
+### Původní tři kapitoly (nápady do budoucna)
 
-**Rozpory s dosavadními rozhodnutími (k vyřešení):**
-1. Sekce 4 má **tři kapitoly**, návrh má pět.
-2. Sekce 4 dává **soláry do kapitoly 2** a OZE (hory, oceán) do kapitoly 3; návrh dává OZE až do kapitoly 3 a soláry nezmiňuje.
-3. Sekce 3 stojí na **dni a noci** (v noci klesá spotřeba, baterie, přetížení). Návrh dává v kapitole 1 **stabilní odběr bez ohledu na den a noc**.
-4. Dnes jsou v kódu **mařič, baterie a regulátor** (regulátor jako konec kapitoly 1); návrh je posouvá (baterie/OZE do kapitoly 3, regulace do kapitoly 4).
-5. Sekce 4 říká, že kapitola 2 se **odemyká po dodání 500 MWh**; návrh ji spouští splněním smlouvy (15 MW).
+Dřívější struktura, ponechaná jako zdroj nápadů:
+
+- **Původní kapitola 1:** spalovna a start; krize po cca 250 MWh (spalovna vyplivne toxický odpad), úkoly dodej 1 MWh, vyčisti 5 políček, dodej 100 MWh.
+- **Původní kapitola 2: Laboratoř, merge a soláry** (po 500 MWh): výzkum merge minihrou (zkumavky 1+1=2, 2+2=4), likvidátor odpadu (za poplatek trvale ničí toxický odpad), solární panely 1×1 přes střídač (jen ve dne, polední špičky, v noci drží síť spalovna), e-odpad (křemík lze recyklovat na VO).
+- **Původní kapitola 3: Biomy a obnovitelné zdroje:** hory (rozbitá přehrada v mlze, 24/7, drahé vysoké napětí), oceán (offshore vítr, výkon náhodně kolísá, nápor na baterie).
