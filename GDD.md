@@ -151,3 +151,21 @@ Z prvního hraní na mobilu (kroky 4 a dál):
 - **Toxická krize** je zatím jen v číslech (přesunuto do kapitoly 2, příjem 60 %); vizuální toxický odpad a úkoly od postav přijdou v kroku 4; brigádníci tam budou omezeni množstvím odpadu na ostrově.
 - **Sběr na mapě** má být omezený (odpad se objevuje s limitem), aby nešlo hru dohrát rychlým klikáním; ceny brigádníků pak přeladit.
 - **Tutoriál s postavami** místo textové nápovědy.
+
+### Návrh přestavby kapitol (8. 11. 2026, ČEKÁ NA ODSOUHLASENÍ, zatím nic z toho není v kódu ani v sekci 4)
+
+Nápad od autora, uložený tak, jak byl řečen. **Nepřepisuje žádné dosavadní rozhodnutí**, jen je doplňuje. Rozpory jsou vypsané dole.
+
+- **Kapitola 1 (finále):** hráč je spalovna, která zásobuje ostrov. Má **nasmlouvanou dodávku (např. 15 MW), kterou musí městu dávat stabilně, bez ohledu na den a noc.** Hlavní bod kapitoly: začít vyrábět stabilně a dodávat smluvních 15 MW. Regulace tu není potřeba.
+- **Kapitola 2 (problém):** odpad ze spalovny, lidé se bouří, město platí méně (nechce „špinavou energii"). Hráč začne odpad likvidovat a rozebírat (v budoucnu merge minihra), pak ho uskladňovat a nevyhazovat na pole. Regulace stále není potřeba: čím víc hráč vyrábí, tím víc město odebírá, byť za snížený poplatek.
+- **Kapitola 3:** úkolem je přesvědčit veřejnost, že jsme čistý zdroj. Vytříděný toxický odpad něco stojí a zabírá vzácnou hrací plochu; vyčistit ji stojí hodně peněz. **Odemknou se obnovitelné zdroje (OZE).**
+- **Kapitola 4:** **regulace** (odemkne se až tady).
+- **Kapitola 5:** **jaderné elektrárny.**
+- Vše má být hezky odstupňované.
+
+**Rozpory s dosavadními rozhodnutími (k vyřešení):**
+1. Sekce 4 má **tři kapitoly**, návrh má pět.
+2. Sekce 4 dává **soláry do kapitoly 2** a OZE (hory, oceán) do kapitoly 3; návrh dává OZE až do kapitoly 3 a soláry nezmiňuje.
+3. Sekce 3 stojí na **dni a noci** (v noci klesá spotřeba, baterie, přetížení). Návrh dává v kapitole 1 **stabilní odběr bez ohledu na den a noc**.
+4. Dnes jsou v kódu **mařič, baterie a regulátor** (regulátor jako konec kapitoly 1); návrh je posouvá (baterie/OZE do kapitoly 3, regulace do kapitoly 4).
+5. Sekce 4 říká, že kapitola 2 se **odemyká po dodání 500 MWh**; návrh ji spouští splněním smlouvy (15 MW).
