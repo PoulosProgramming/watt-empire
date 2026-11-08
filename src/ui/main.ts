@@ -73,6 +73,7 @@ app.innerHTML = `
   <div class="card">
     <div class="row"><span>Stav</span><b id="incstate"></b></div>
     <div class="row"><span>Sklad VO</span><b id="incstock"></b></div>
+    <div class="row"><span>Cena VO navíc (nad sklad)</span><b>${VO_OVERFLOW_PRICE} 💰 / VO</b></div>
     <div class="row"><span>Výkon</span><b id="inclevel"></b></div>
     <button id="toggle" style="width:100%;margin-top:6px"></button>
   </div>
@@ -212,7 +213,9 @@ function render(): void {
       line('Autonomie', l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : `✖ chybí ${fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2)} VO/s (najmi brigádníka, kup účinnost nebo klikej)`, l.autonomous ? 'plus' : 'minus') +
       line('Celkem (bez tapů)', signed(voNet), 'total') +
       line('Sklad', `${fmt(s.vo, 0)} / ${fmt(voStorageMax(s), 0)} VO`) +
-      `<small>Co se do skladu nevejde, se automaticky prodá za ${VO_OVERFLOW_PRICE} 💰 za 1 VO.</small>`;
+      line('Cena VO navíc (nad sklad)', `${VO_OVERFLOW_PRICE} 💰 / VO`) +
+      line('Prodej přebytku teď', `+${fmt(l.overflowIncomePerSecond, 2)} 💰/s`, l.overflowIncomePerSecond > 0.01 ? 'plus' : '') +
+      `<small>Co se do skladu nevejde, se automaticky prodá.</small>`;
   }
   $('statdetail').innerHTML = detail ? `<div class="card detail">${detail}</div>` : '';
 
