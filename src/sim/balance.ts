@@ -154,6 +154,16 @@ export const STORY_INTRO =
 export const STORY_CHAPTER_END =
   'Město svítí a ostrov dýchá. Regulátor drží síť sám a tobě zbývá jen hlídat peníze. Jenže stará spalovna pálí odpad dál a pod hladinou se probouzí něco většího. Konec kapitoly 1. V kapitole 2 přijde laboratoř, likvidátor odpadu a první soláry. Zatím jde hra dál ladit: dohraj poslední úkoly a pošli, co ti vadilo.';
 
+// ---- Mapa (jen vzhled, simulace o ní neví) ----
+export const MAP_GRID_SIZE = 20; // mřížka 20×20 dlaždic
+export const MAP_TILE_PX = 32; // velikost dlaždice ve světových pixelech
+export const MAP_INCINERATOR_TILE = { x: 9, y: 9 }; // levý horní roh spalovny (2×2) uprostřed
+export const MAP_CITY_TILE = { x: 16, y: 16 }; // levý horní roh města (3×3) vpravo dole
+export const MAP_ZOOM_START = 1.1; // počáteční přiblížení (viditelná je jen část mapy)
+export const MAP_ZOOM_MAX = 2.5;
+export const MAP_DRAG_THRESHOLD_PX = 8; // posun mapy až po pohybu prstu o tolik pixelů
+export const MAP_HEIGHT_PERCENT = 46; // výška mapy v % obrazovky (zbytek je panel)
+
 // ---- Oznámení ----
 export const TOAST_SECONDS = 7; // jak dlouho je vidět oznámení o splněném úkolu
 

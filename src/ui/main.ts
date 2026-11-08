@@ -10,6 +10,7 @@ import {
   SECONDS_PER_GAME_HOUR,
   INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
+  MAP_HEIGHT_PERCENT,
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
   ONGOING_QUESTS_VISIBLE,
@@ -31,6 +32,7 @@ import { TICK_DT, simulateOffline, tick } from '../sim/game';
 import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
+import { createMap } from './map';
 import { newGame } from '../sim/state';
 
 const SAVE_KEY = 'watt-empire-save';
@@ -77,6 +79,8 @@ app.innerHTML = `
   </div>
   <div id="statdetail"></div></div>
   <div id="alerts"></div>
+  <div id="map"></div>
+  <div id="panel">
   <div class="card story">📖 ${STORY_INTRO}</div>
   <div id="ending"></div>
   <details class="card help" open>
@@ -114,6 +118,7 @@ app.innerHTML = `
 
   <h2>Ladění</h2>
   <div class="card debug" id="debug"></div>
+  </div>
 `;
 
 let openStat = '';
@@ -365,6 +370,18 @@ function render(): void {
     : `<div class="row"><span>Splněno</span><b>${ongoingDone} / ${ongoingTotal}</b></div>` +
       ongoing.slice(0, ONGOING_QUESTS_VISIBLE).map(questRow).join('');
 }
+
+// Mapa (Phaser): jen čte stav hry, nic v simulaci nemění
+$('map').style.flex = `0 0 ${MAP_HEIGHT_PERCENT}%`;
+createMap($('map'), () => ({
+  incineratorOn: state.incineratorOn,
+  incineratorRunning: state.incineratorRunning,
+  productionMW: state.live.productionMW,
+  deliveredMW: state.live.deliveredMW,
+  demandMW: state.live.demandMW,
+  hour: state.hour,
+  isNight: !isDay(state.hour),
+}));
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce
 let last = performance.now();
