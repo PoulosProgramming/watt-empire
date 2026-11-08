@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHAPTER1_END_QUESTS, CONTRACT_MW, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
-import { runCrisis } from '../src/sim/quests';
+import { questFraction, runCrisis } from '../src/sim/quests';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
 import { newGame } from '../src/sim/state';
@@ -461,13 +461,18 @@ describe('průběžné úkoly', () => {
   });
 });
 
-describe('brigádníci v kapitole 1', () => {
-  it('maximum je 6 a víc koupit nejde', () => {
+describe('brigádníci', () => {
+  it('počet brigádníků není omezený, omezuje ho jen cena', () => {
     const s = newGame();
     s.upgrades.power = 1;
     s.credits = 1e9;
-    for (let i = 0; i < 20; i++) buyUpgrade(s, 'worker');
-    expect(s.upgrades.worker).toBe(6);
+    for (let i = 0; i < 12; i++) buyUpgrade(s, 'worker');
+    expect(s.upgrades.worker).toBe(12);
+    // každý další je dražší
+    expect(upgradeCost('worker', 12)).toBeGreaterThan(upgradeCost('worker', 11));
+    // bez peněz už nejde koupit
+    s.credits = 0;
+    expect(buyUpgrade(s, 'worker')).toBe(false);
   });
 
   it('6 brigádníků zvládne plných 10 MW, když je účinnost aspoň 4', () => {
@@ -506,5 +511,40 @@ describe('pořadí úkolů', () => {
         expect(q.target).toBeLessThanOrEqual(def.maxLevel);
       }
     }
+  });
+});
+
+describe('ukazatel postupu úkolů', () => {
+  const q = (id: string) => QUESTS.find((x) => x.id === id)!;
+
+  it('úkol na úroveň vylepšení ukazuje podíl, splněný úkol 1', () => {
+    const s = newGame();
+    s.upgrades.worker = 2;
+    expect(questFraction(s, q('worker3'))).toBeCloseTo(2 / 3, 5);
+    s.doneQuests = ['worker3'];
+    expect(questFraction(s, q('worker3'))).toBe(1);
+  });
+
+  it('smlouva ukazuje skutečnou dodávku vůči 15 MW', () => {
+    const s = newGame();
+    s.live.deliveredMW = 7.5;
+    expect(questFraction(s, q('contract'))).toBeCloseTo(0.5, 5);
+    s.contractMet = true;
+    expect(questFraction(s, q('contract'))).toBe(1);
+  });
+
+  it('autonomie ukazuje, kolik VO/s brigádníci dodají oproti potřebě', () => {
+    const s = newGame();
+    s.live.voNeedPerSecond = 2;
+    s.live.voPerSecond = 0.5;
+    expect(questFraction(s, q('autonomy'))).toBeCloseTo(0.25, 5);
+    s.live.autonomous = true;
+    expect(questFraction(s, q('autonomy'))).toBe(1);
+  });
+
+  it('podíl nikdy nepřekročí 1', () => {
+    const s = newGame();
+    s.delivered = 1e6;
+    expect(questFraction(s, q('deliver30'))).toBe(1);
   });
 });

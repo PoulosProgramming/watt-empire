@@ -70,3 +70,12 @@ small { color: #94a3b8; }
 .modal-ok { width: 100%; min-height: 52px; background: #dc2626; font-size: 18px; }
 
 .map-night { position: absolute; inset: 0; background: rgba(10, 16, 48, .4); opacity: 0; transition: opacity 1.5s; pointer-events: none; }
+
+#tracker { background: rgba(30, 41, 59, .93); border-radius: 12px; padding: 8px 10px 10px; box-shadow: 0 2px 8px rgba(0,0,0,.4); font-size: 13px; }
+#tracker .tr-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 28px; font-weight: 600; cursor: pointer; }
+#tracker .bar { margin-top: 3px; height: 8px; }
+#tracker .bar.chap i { background: #60a5fa; }
+#tracker .bar.q i { background: #4ade80; }
+#tracker .tr-row { margin-top: 8px; }
+#tracker .tr-top { display: flex; justify-content: space-between; gap: 8px; line-height: 1.25; }
+#tracker .tr-top span:last-child { white-space: nowrap; color: #cbd5e1; }

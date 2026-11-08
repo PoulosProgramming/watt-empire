@@ -1,4 +1,4 @@
-import { QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, type QuestDef, type Requirement } from './balance';
+import { CONTRACT_MW, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, type QuestDef, type Requirement } from './balance';
 import type { GameState } from './state';
 
 export function requirementProgress(s: GameState, r: Requirement): number {
@@ -36,4 +36,17 @@ export function runCrisis(s: GameState, dt: number, triggerQuest: string | null 
     s.toxic = true;
     s.toxicCountdown = -1;
   }
+}
+
+// Jak daleko je úkol (0 až 1), pro ukazatel postupu. U smlouvy a autonomie se ukazuje skutečné přiblížení,
+// ne jen 0 nebo 1.
+export function questFraction(s: GameState, q: QuestDef): number {
+  if (s.doneQuests.includes(q.id)) return 1;
+  if (q.kind === 'contract') return s.contractMet ? 1 : Math.min(1, s.live.deliveredMW / CONTRACT_MW);
+  if (q.kind === 'autonomy') {
+    if (s.live.autonomous) return 1;
+    const need = s.live.voNeedPerSecond;
+    return need > 0 ? Math.min(1, s.live.voPerSecond / need) : 0;
+  }
+  return Math.min(1, questProgress(s, q) / q.target);
 }
