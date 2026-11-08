@@ -1,0 +1,111 @@
+import {
+  BATTERY_CAPACITY_PER_LEVEL_MWH,
+  BATTERY_RATE_PER_LEVEL_MW,
+  BLACKOUT_FEE,
+  BLACKOUT_SECONDS,
+  CREDITS_PER_MWH,
+  DEMAND_PER_PRESTIGE,
+  INCINERATOR_MIN_LOAD,
+  INCINERATOR_NOMINAL_MW,
+  INCINERATOR_VO_PER_MWH,
+  LINE_BASE_CAPACITY_MW,
+  LINE_UPGRADE_MW,
+  OVERLOAD_TOLERANCE_SECONDS,
+  PRESTIGE_THRESHOLDS_MWH,
+  SECONDS_PER_GAME_HOUR,
+} from './balance';
+import { baseDemandMW } from './daynight';
+import { voPerMWh } from './economy';
+import type { GameState } from './state';
+
+export function prestige(s: GameState): number {
+  let p = 1;
+  PRESTIGE_THRESHOLDS_MWH.forEach((t, i) => {
+    if (s.delivered >= t) p = i + 1;
+  });
+  return p;
+}
+
+export const lineCapacityMW = (s: GameState) => LINE_BASE_CAPACITY_MW + s.upgrades.line * LINE_UPGRADE_MW;
+export const batteryCapacityMWh = (s: GameState) => s.upgrades.battery * BATTERY_CAPACITY_PER_LEVEL_MWH;
+export const batteryRateMW = (s: GameState) => s.upgrades.battery * BATTERY_RATE_PER_LEVEL_MW;
+export const cityDemandMW = (s: GameState) =>
+  baseDemandMW(s.hour) * (1 + (prestige(s) - 1) * DEMAND_PER_PRESTIGE);
+
+// Jednoduchá síť: výroba -> (baterie) -> vedení -> město.
+// Přebytek, který nejde nikam uložit, přetěžuje síť.
+export function runPower(s: GameState, dt: number): void {
+  const dtH = dt / SECONDS_PER_GAME_HOUR; // délka tiku v herních hodinách
+  const live = s.live;
+  live.demandMW = cityDemandMW(s);
+
+  // Blackout: nic se neděje, jen odpočet.
+  if (s.blackout > 0) {
+    s.blackout = Math.max(0, s.blackout - dt);
+    live.productionMW = 0;
+    live.deliveredMW = 0;
+    live.batteryFlowMW = 0;
+    live.wastedMW = 0;
+    live.incomePerSecond = 0;
+    return;
+  }
+
+  // 1) Výroba ve spalovně (omezená zásobou VO)
+  let production = 0;
+  if (s.incineratorOn) {
+    const vpm = voPerMWh(s, INCINERATOR_VO_PER_MWH);
+    const wantedMWh = INCINERATOR_NOMINAL_MW * dtH;
+    const possibleMWh = Math.min(wantedMWh, s.vo / vpm);
+    s.vo -= possibleMWh * vpm;
+    production = possibleMWh / dtH;
+    // Spalovna nemůže běžet pod minimálním výkonem; slabší zásoba = zhasne
+    if (production < INCINERATOR_NOMINAL_MW * INCINERATOR_MIN_LOAD) {
+      s.vo += possibleMWh * vpm; // vrať palivo
+      production = 0;
+    }
+  }
+
+  // 2) Dodávka městu a baterie
+  const demand = live.demandMW;
+  const line = lineCapacityMW(s);
+  const rate = batteryRateMW(s);
+  const dischargeRoom = Math.min(rate, s.battery / dtH);
+  const chargeRoom = Math.min(rate, (batteryCapacityMWh(s) - s.battery) / dtH);
+
+  let toCity = Math.min(production, demand, line);
+  let battery = 0; // + nabíjí, - vybíjí
+  if (production > toCity) {
+    battery = Math.min(production - toCity, chargeRoom);
+  } else if (toCity < Math.min(demand, line)) {
+    const missing = Math.min(demand, line) - toCity;
+    const discharge = Math.min(missing, dischargeRoom);
+    toCity += discharge;
+    battery = -discharge;
+  }
+  const wasted = Math.max(0, production - Math.min(production, demand, line) - Math.max(0, battery));
+  s.battery = Math.min(batteryCapacityMWh(s), Math.max(0, s.battery + battery * dtH));
+
+  // 3) Dodaná energie = peníze
+  const mwh = toCity * dtH;
+  s.delivered += mwh;
+  s.credits += mwh * CREDITS_PER_MWH;
+
+  // 4) Přetížení
+  if (wasted > 0.01) {
+    s.overload += dt;
+    if (s.overload >= OVERLOAD_TOLERANCE_SECONDS) {
+      s.blackout = BLACKOUT_SECONDS;
+      s.overload = 0;
+      s.credits = Math.max(0, s.credits - BLACKOUT_FEE); // nikdy do mínusu
+    }
+  } else {
+    s.overload = Math.max(0, s.overload - dt);
+  }
+
+  live.productionMW = production;
+  live.deliveredMW = toCity;
+  live.batteryFlowMW = battery;
+  live.wastedMW = wasted;
+  live.incomePerSecond = (toCity / SECONDS_PER_GAME_HOUR) * CREDITS_PER_MWH;
+}
+
