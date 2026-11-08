@@ -1,33 +1,57 @@
 import './style.css';
 import {
+  AUTOSAVE_SECONDS,
   DEBUG_CREDITS_BONUS,
   DEBUG_SPEEDS,
   INCINERATOR_START_VO,
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
   QUESTS,
+  QUESTS_VISIBLE,
   STORY_CHAPTER_END,
   STORY_INTRO,
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
-import { buyUpgrade, tap, upgradeCost } from '../sim/economy';
+import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../sim/economy';
 import { TICK_DT, tick } from '../sim/game';
 import { batteryCapacityMWh, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
+import { deserialize, serialize } from '../sim/save';
 import { newGame } from '../sim/state';
 
-const state = newGame();
+const SAVE_KEY = 'watt-empire-save';
+function loadSaved() {
+  try {
+    return deserialize(localStorage.getItem(SAVE_KEY));
+  } catch {
+    return null; // úložiště nemusí být dostupné (např. anonymní okno)
+  }
+}
+function saveNow(): void {
+  try {
+    localStorage.setItem(SAVE_KEY, serialize(state));
+  } catch {
+    /* nejde uložit, hra běží dál */
+  }
+}
+const state = loadSaved() ?? newGame();
+setInterval(saveNow, AUTOSAVE_SECONDS * 1000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveNow();
+});
+window.addEventListener('pagehide', saveNow);
 let speed = 1;
 const fmt = (n: number, d = 1) => n.toFixed(d);
 
 const app = document.getElementById('app')!;
 app.innerHTML = `
-  <div class="stats">
-    <div class="stat"><b id="credits"></b><small id="income"></small></div>
-    <div class="stat"><b id="energy"></b><small id="power"></small></div>
-    <div class="stat"><b id="vo"></b><small id="vops"></small></div>
+  <div class="sticky"><div class="stats">
+    <button class="stat" data-stat="credits"><b id="credits"></b><small id="income"></small></button>
+    <button class="stat" data-stat="energy"><b id="energy"></b><small id="power"></small></button>
+    <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
   </div>
+  <div id="statdetail"></div></div>
   <div id="alerts"></div>
   <div class="card story">📖 ${STORY_INTRO}</div>
   <div id="ending"></div>
@@ -60,6 +84,13 @@ app.innerHTML = `
   <div class="card debug" id="debug"></div>
 `;
 
+let openStat = '';
+document.querySelectorAll<HTMLElement>('.stat').forEach((el) =>
+  el.addEventListener('click', () => {
+    openStat = openStat === el.dataset.stat ? '' : el.dataset.stat!;
+  }),
+);
+
 const $ = (id: string) => document.getElementById(id)!;
 
 $('tap').addEventListener('click', () => tap(state));
@@ -82,17 +113,69 @@ DEBUG_SPEEDS.forEach((sp) => {
   b.addEventListener('click', () => (speed = sp));
   $('speeds').appendChild(b);
 });
+const resetBtn = document.createElement('button');
+resetBtn.textContent = 'Smazat postup';
+resetBtn.addEventListener('click', () => {
+  if (confirm('Opravdu smazat celý postup a začít od nuly?')) {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {
+      /* nic */
+    }
+    location.reload();
+  }
+});
+$('debug').appendChild(resetBtn);
 $('bonus').addEventListener('click', () => (state.credits += DEBUG_CREDITS_BONUS));
 
 function render(): void {
   const s = state;
   const l = s.live;
   $('credits').textContent = `💰 ${Math.floor(s.credits)}`;
-  $('income').textContent = `+${fmt(l.incomePerSecond)}/s`;
-  $('energy').textContent = `⚡ ${fmt(s.delivered)} MWh`;
-  $('power').textContent = `${fmt(l.deliveredMW)} MW`;
+  {
+    const n = l.incomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
+    $('income').textContent = `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n))}/s`;
+  }
+  $('energy').textContent = `⚡ ${fmt(l.productionMW)} MW`;
+  $('power').textContent = `chce ${fmt(l.demandMW)} MW`;
   $('vo').textContent = `♻️ ${fmt(s.vo, 0)} VO`;
   $('vops').textContent = `+${fmt(l.voPerSecond)}/s`;
+
+  const line = (name: string, value: string, cls = '') => `<div class="row ${cls}"><span>${name}</span><b>${value}</b></div>`;
+  const signed = (n: number) => `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n), 2)}/s`;
+  const net = l.incomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
+  let detail = '';
+  if (openStat === 'credits') {
+    detail =
+      line('Prodej energie městu', `+${fmt(l.incomePerSecond, 2)}/s`, 'plus') +
+      line('Mzdy brigádníků', `−${fmt(l.wagePerSecond, 2)}/s`, 'minus') +
+      line('Mařič přebytku', `−${fmt(l.dumpCostPerSecond, 2)}/s`, 'minus') +
+      line('Celkem', signed(net), 'total') +
+      (s.toxic ? `<small>☣️ Krize: město platí jen ${Math.round(TOXIC_INCOME_FACTOR * 100)} %.</small>` : '');
+  } else if (openStat === 'energy') {
+    const toBattery = Math.max(0, l.batteryFlowMW);
+    const fromBattery = Math.max(0, -l.batteryFlowMW);
+    detail =
+      line('Výroba spalovny', `${fmt(l.productionMW)} MW`, 'plus') +
+      line('Z baterie', `+${fmt(fromBattery)} MW`, fromBattery > 0.01 ? 'plus' : '') +
+      line('Do baterie', `−${fmt(toBattery)} MW`, toBattery > 0.01 ? 'minus' : '') +
+      line('Spálí mařič', `−${fmt(l.dumpedMW)} MW`, l.dumpedMW > 0.01 ? 'minus' : '') +
+      line('Ztraceno (přetížení)', `−${fmt(l.wastedMW)} MW`, l.wastedMW > 0.01 ? 'minus' : '') +
+      line('Dodáváme městu', `${fmt(l.deliveredMW)} MW`, 'total') +
+      line('Město chce', `${fmt(l.demandMW)} MW`) +
+      line('Vedení unese', `${lineCapacityMW(s)} MW`) +
+      line('Baterie', `${fmt(s.battery)} / ${batteryCapacityMWh(s)} MWh`) +
+      `<small>Dodáno celkem: ${fmt(s.delivered)} MWh</small>`;
+  } else if (openStat === 'vo') {
+    const voNet = l.voPerSecond - l.voBurnedPerSecond;
+    detail =
+      line('Brigádníci', `+${fmt(l.voPerSecond, 2)}/s`, 'plus') +
+      line('Ruční třídění', `${s.taps} tapů celkem`) +
+      line('Spálí spalovna', `−${fmt(l.voBurnedPerSecond, 2)}/s`, 'minus') +
+      line('Celkem (bez tapů)', signed(voNet), 'total') +
+      line('Sklad', `${fmt(s.vo, 0)} VO`);
+  }
+  $('statdetail').innerHTML = detail ? `<div class="card detail">${detail}</div>` : '';
 
   const hh = Math.floor(s.hour).toString().padStart(2, '0');
   const mm = Math.floor((s.hour % 1) * 60).toString().padStart(2, '0');
@@ -129,6 +212,11 @@ function render(): void {
 
   for (const { def, el } of upgradeButtons) {
     const lvl = s.upgrades[def.id];
+    if (!isUnlocked(s, def.id)) {
+      el.disabled = true;
+      el.innerHTML = `<span>🔒 ${def.name}<small>Odemkne se ${def.unlock!.text}</small></span>`;
+      continue;
+    }
     const max = lvl >= def.maxLevel;
     const cost = upgradeCost(def.id, lvl);
     el.disabled = max || s.credits < cost;
@@ -140,11 +228,17 @@ function render(): void {
     ? `<div class="card ending"><b>🏁 Konec kapitoly 1</b><p>${STORY_CHAPTER_END}</p></div>`
     : '';
 
-  $('quests').innerHTML = QUESTS.map((q) => {
-    const done = s.doneQuests.includes(q.id);
-    const p = Math.min(q.target, questProgress(s, q));
-    return `<div class="row quest ${done ? 'done' : ''}"><span>${q.text}</span><span>${done ? '✔' : `${fmt(p, 0)}/${q.target} (+${q.reward}💰)`}</span></div>`;
-  }).join('');
+  const open = QUESTS.filter((q) => !s.doneQuests.includes(q.id));
+  const shown = open.slice(0, QUESTS_VISIBLE);
+  $('quests').innerHTML =
+    `<div class="row"><span>Splněno</span><b>${s.doneQuests.length} / ${QUESTS.length}</b></div>` +
+    shown
+      .map((q) => {
+        const p = Math.min(q.target, questProgress(s, q));
+        return `<div class="row quest"><span>${q.text}</span><span>${fmt(p, 0)}/${q.target} (+${q.reward}💰)</span></div>`;
+      })
+      .join('') +
+    (open.length > shown.length ? `<small>…a ${open.length - shown.length} dalších úkolů se odemkne postupně.</small>` : '');
 }
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce

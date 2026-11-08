@@ -2,8 +2,9 @@
 html, body { margin: 0; background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; touch-action: manipulation; }
 #app { max-width: 480px; margin: 0 auto; padding: 8px 12px 40px; }
 h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin: 18px 0 6px; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; position: sticky; top: 0; background: #0f172a; padding: 6px 0; z-index: 2; }
-.stat { background: #1e293b; border-radius: 10px; padding: 8px; text-align: center; }
+.sticky { position: sticky; top: 0; background: #0f172a; padding: 6px 0; z-index: 2; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.stat { color: inherit; font-weight: 400; font-size: inherit; min-height: 44px; background: #1e293b; border-radius: 10px; padding: 8px; text-align: center; }
 .stat b { display: block; font-size: 20px; }
 .stat small { color: #94a3b8; font-size: 12px; }
 .card { background: #1e293b; border-radius: 10px; padding: 10px; margin-bottom: 8px; }
@@ -32,3 +33,9 @@ small { color: #94a3b8; }
 .story { font-size: 14px; line-height: 1.4; color: #cbd5e1; border-left: 4px solid #f59e0b; }
 .ending { border: 2px solid #4ade80; }
 .ending p { margin: 6px 0 0; font-size: 14px; color: #cbd5e1; }
+
+.stat[data-stat] { cursor: pointer; }
+.detail { margin: 6px 0 0; }
+.detail .plus b { color: #4ade80; }
+.detail .minus b { color: #f87171; }
+.detail .total { border-top: 1px solid #334155; margin-top: 4px; padding-top: 4px; font-size: 15px; }

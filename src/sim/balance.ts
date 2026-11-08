@@ -56,6 +56,13 @@ export const PRESTIGE_THRESHOLDS_MWH = [0, 400, 1000, 2500, 6000];
 // ---- Vylepšení ----
 export type UpgradeId = 'worker' | 'power' | 'efficiency' | 'line' | 'battery' | 'dump' | 'regulator';
 
+// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení
+export interface Requirement {
+  kind: 'delivered' | 'taps' | 'upgrade';
+  target: number;
+  upgrade?: UpgradeId; // jen pro kind 'upgrade'
+}
+
 export interface UpgradeDef {
   id: UpgradeId;
   name: string;
@@ -63,31 +70,33 @@ export interface UpgradeDef {
   baseCost: number;
   growth: number; // cena × growth s každou úrovní
   maxLevel: number;
+  unlock?: Requirement & { text: string }; // bez podmínky je vylepšení dostupné hned
 }
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 120, growth: 1.75, maxLevel: 12 },
-  { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz, ale v noci hrozí přebytek)', baseCost: 300, growth: 1.8, maxLevel: 7 },
-  { id: 'efficiency', name: 'Účinnost spalovny', description: 'Z méně VO více energie', baseCost: 400, growth: 1.9, maxLevel: 10 },
-  { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10 },
-  { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5 },
-  { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10 },
-  { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1 },
+  { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 500, growth: 1.45, maxLevel: 10, unlock: { kind: 'taps', target: 200, text: 'po 200 odklikaných VO' } },
+  { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz, ale v noci hrozí přebytek)', baseCost: 300, growth: 1.8, maxLevel: 7, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' } },
+  { id: 'efficiency', name: 'Účinnost spalovny', description: 'Z méně VO více energie', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' } },
+  { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
+  { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'upgrade', upgrade: 'power', target: 2, text: 'po výkonu spalovny 5 MW' } },
+  { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'delivered', target: 30, text: 'po dodání 30 MWh' } },
+  { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1, unlock: { kind: 'delivered', target: 250, text: 'po dodání 250 MWh (po ekologické krizi)' } },
 ];
 
 // ---- Úkoly (zatím bez postav) ----
-export interface QuestDef {
+export interface QuestDef extends Requirement {
   id: string;
   text: string;
-  kind: 'delivered' | 'taps' | 'upgrade'; // dodáno MWh | ruční tapy | úroveň vylepšení
-  target: number;
   reward: number;
-  upgrade?: UpgradeId; // jen pro kind 'upgrade'
 }
+
+// Kolik nejbližších nesplněných úkolů se hráči zobrazí (ostatní se odemykají postupně)
+export const QUESTS_VISIBLE = 3;
 
 export const QUESTS: QuestDef[] = [
   { id: 'deliver1', text: 'Dodej městu 1 MWh', kind: 'delivered', target: 1, reward: 20 },
   { id: 'tap25', text: 'Vyčisti 25 odpadků (ruční tapy)', kind: 'taps', target: 25, reward: 30 },
+  { id: 'tap200', text: 'Vyčisti 200 odpadků (odemkne brigádníky)', kind: 'taps', target: 200, reward: 60 },
   { id: 'worker3', text: 'Najmi 3 brigádníky', kind: 'upgrade', upgrade: 'worker', target: 3, reward: 80 },
   { id: 'deliver30', text: 'Dodej městu 30 MWh', kind: 'delivered', target: 30, reward: 150 },
   { id: 'power2', text: 'Zvyš výkon spalovny na úroveň 2 (5 MW)', kind: 'upgrade', upgrade: 'power', target: 2, reward: 300 },
@@ -105,6 +114,9 @@ export const STORY_INTRO =
   'Zamořený ostrov. Jediná věc, která tu ještě funguje, je stará spalovna odpadu. Městečko za kopcem je bez proudu a starosta tě prosí: roztoč spalovnu, vyčisti pláž a dodej městu elektřinu, než zhasne naposledy.';
 export const STORY_CHAPTER_END =
   'Město svítí a ostrov dýchá, ale spalovna vyplivla toxický odpad a pod hladinou se probouzí něco většího. Konec kapitoly 1. V kapitole 2 přijde laboratoř, likvidátor odpadu a první soláry. Zatím jde hra dál ladit: dohraj poslední úkoly a pošli, co ti vadilo.';
+
+// ---- Ukládání ----
+export const AUTOSAVE_SECONDS = 60; // jak často se postup ukládá (navíc při zavření stránky)
 
 // ---- Ladění ----
 export const DEBUG_SPEEDS = [1, 10];

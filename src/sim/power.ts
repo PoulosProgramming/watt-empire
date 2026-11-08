@@ -57,6 +57,8 @@ export function runPower(s: GameState, dt: number): void {
     live.wastedMW = 0;
     live.dumpedMW = 0;
     live.incomePerSecond = 0;
+    live.dumpCostPerSecond = 0;
+    live.voBurnedPerSecond = 0;
     return;
   }
 
@@ -70,6 +72,7 @@ export function runPower(s: GameState, dt: number): void {
     s.incineratorLevel = 1; // bez regulátoru běží spalovna pevným výkonem
   }
   let production = 0;
+  let voBurned = 0; // VO za sekundu
   if (s.incineratorOn) {
     const vpm = voPerMWh(s, INCINERATOR_VO_PER_MWH);
     const wantedMW = incineratorNominalMW(s) * s.incineratorLevel;
@@ -80,6 +83,7 @@ export function runPower(s: GameState, dt: number): void {
         s.incineratorRunning = false; // sklad je prázdný, čeká na dodávky
       } else {
         s.vo -= neededVO;
+        voBurned = neededVO / dt;
         production = wantedMW;
       }
     }
@@ -140,6 +144,8 @@ export function runPower(s: GameState, dt: number): void {
   live.batteryFlowMW = battery;
   live.wastedMW = wasted;
   live.dumpedMW = dumped;
+  live.dumpCostPerSecond = (dumped / SECONDS_PER_GAME_HOUR) * DUMP_COST_PER_MWH;
+  live.voBurnedPerSecond = voBurned;
   live.incomePerSecond = (toCity / SECONDS_PER_GAME_HOUR) * creditsPerMWh;
 }
 
