@@ -11,6 +11,7 @@ import {
   QUESTS_VISIBLE,
   STORY_CHAPTER_END,
   STORY_INTRO,
+  TOAST_SECONDS,
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
@@ -91,6 +92,29 @@ document.querySelectorAll<HTMLElement>('.stat').forEach((el) =>
     openStat = openStat === el.dataset.stat ? '' : el.dataset.stat!;
   }),
 );
+
+// Oznámení o splněném úkolu (po načtení hry se už splněné úkoly neoznamují)
+const seenQuests = new Set(state.doneQuests);
+const toasts = document.createElement('div');
+toasts.id = 'toasts';
+document.body.appendChild(toasts);
+function showToast(html: string): void {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = html;
+  const close = () => el.remove();
+  el.addEventListener('click', close);
+  setTimeout(close, TOAST_SECONDS * 1000);
+  toasts.appendChild(el);
+}
+function announceQuests(): void {
+  for (const q of QUESTS) {
+    if (state.doneQuests.includes(q.id) && !seenQuests.has(q.id)) {
+      seenQuests.add(q.id);
+      showToast(`✅ <b>Úkol splněn!</b><br>${q.text}<br><b>+${q.reward} 💰</b>`);
+    }
+  }
+}
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -263,6 +287,7 @@ function frame(now: number): void {
     tick(state);
     acc -= TICK_DT;
   }
+  announceQuests();
   render();
   requestAnimationFrame(frame);
 }

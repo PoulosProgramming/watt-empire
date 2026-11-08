@@ -115,6 +115,9 @@ export const STORY_INTRO =
 export const STORY_CHAPTER_END =
   'Město svítí a ostrov dýchá, ale spalovna vyplivla toxický odpad a pod hladinou se probouzí něco většího. Konec kapitoly 1. V kapitole 2 přijde laboratoř, likvidátor odpadu a první soláry. Zatím jde hra dál ladit: dohraj poslední úkoly a pošli, co ti vadilo.';
 
+// ---- Oznámení ----
+export const TOAST_SECONDS = 7; // jak dlouho je vidět oznámení o splněném úkolu
+
 // ---- Ukládání ----
 export const AUTOSAVE_SECONDS = 60; // jak často se postup ukládá (navíc při zavření stránky)
 

@@ -48,5 +48,6 @@ Zapisuj sem, co ukázalo hraní, ať další agent ví, proč je hra nastavená 
 - **Ztráta postupu po obnovení stránky** hráče naštvala, proto se ukládá už teď (předčasně před krokem 5). V ladění je tlačítko „Smazat postup".
 - **Postupné odemykání:** vylepšení mají podmínku `unlock` v `balance.ts` (např. brigádníci až po 2 upgradech výkonu spalovny, takže hráč první minuty jen klikne) a úkoly se zobrazují po třech (`QUESTS_VISIBLE`). Pořadí úkolů musí odpovídat odemykání, aby žádný úkol nečekal na zamčené vylepšení bez důvodu.
 - **Transparentní limity:** hráč vidí rozsah odběru města (noc až poledne, `cityDemandRangeMW`) a upgrade výkonu spalovny před koupí varuje, když by výkon přesáhl noční odběr, vedení nebo maximum města. Nové upgrady s nějakou pastí mají takhle varovat taky.
+- **Oznámení o splněném úkolu:** hráč dostal náhodně 2000 kreditů bez vysvětlení, proto se po splnění úkolu ukáže zelené oznámení s názvem a odměnou (klepnutím se zavře, `TOAST_SECONDS`). Každá další odměna nebo událost, která mění kredity, by měla být oznámená.
 - **Karta ⚡** ukazuje bilanci výkonu (výroba, baterie, mařič, ztráty, dodávka vs. co město chce), ne celkově dodané MWh (to je jen malá poznámka v rozpisu).
 - **Nevyřešeno:** čím se bude zvedat spotřeba města (budovy klikem, růst jen při online hraní, viz GDD sekce 9).
