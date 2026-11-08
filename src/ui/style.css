@@ -1,14 +1,26 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; touch-action: manipulation; }
-/* Rozložení: nahoře karty, pod nimi mapa, dole posouvatelný panel */
-#app { max-width: 480px; height: 100dvh; margin: 0 auto; padding: 8px 12px 0; display: flex; flex-direction: column; }
-#map { min-height: 200px; border-radius: 12px; overflow: hidden; touch-action: none; background: #0b3b5c; margin: 4px 0 8px; position: relative; }
+/* Rozložení: mapa přes celou plochu, nahoře karty, záložky s emoji na boku a menu přes mapu */
+#app { position: relative; width: 100%; height: 100dvh; }
+#map { position: absolute; inset: 0; overflow: hidden; touch-action: none; background: #0b3b5c; }
 #map canvas { display: block; touch-action: none; }
-#panel { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 40px; -webkit-overflow-scrolling: touch; }
+#hud { position: absolute; top: 8px; left: 8px; right: 66px; max-width: 460px; z-index: 5; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+#hud > * { pointer-events: auto; }
+#statdetail:empty, #alerts:empty { display: none; }
+#statdetail .detail { max-height: 50dvh; overflow-y: auto; background: rgba(30, 41, 59, .96); }
+.tap { position: absolute; left: 12px; bottom: 16px; z-index: 5; width: auto; min-height: 56px; padding: 0 20px; font-size: 17px; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+#tabs { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 8; }
+.tab { width: 50px; height: 50px; min-height: 50px; padding: 0; font-size: 26px; line-height: 1; background: rgba(30, 41, 59, .94); border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
+.tab.active { border-color: #60a5fa; background: #1e3a5f; }
+#sheet { position: absolute; top: 12px; max-height: calc(100dvh - 24px); right: 68px; width: min(calc(100% - 78px), 440px); z-index: 7; display: flex; flex-direction: column; background: #0f172a; border: 1px solid #334155; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.6); overflow: hidden; }
+#sheet[hidden] { display: none; }
+#sheet header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 14px; border-bottom: 1px solid #334155; font-size: 17px; }
+#sheet header button { min-height: 44px; width: 44px; padding: 0; background: #334155; }
+.sheetbody { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; -webkit-overflow-scrolling: touch; }
+.sheetbody [hidden] { display: none; }
 h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin: 18px 0 6px; }
-.sticky { background: #0f172a; padding: 6px 0; z-index: 2; flex: 0 0 auto; max-height: 45dvh; overflow-y: auto; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.stat { color: inherit; font-weight: 400; font-size: inherit; min-height: 44px; background: #1e293b; border-radius: 10px; padding: 8px; text-align: center; }
+.stat { color: inherit; font-weight: 400; font-size: inherit; min-height: 44px; background: rgba(30, 41, 59, .92); box-shadow: 0 2px 8px rgba(0,0,0,.4); border-radius: 10px; padding: 8px; text-align: center; }
 .stat b { display: block; font-size: 20px; }
 .stat small { color: #94a3b8; font-size: 12px; }
 .card { background: #1e293b; border-radius: 10px; padding: 10px; margin-bottom: 8px; }
@@ -16,7 +28,7 @@ h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: #
 button { min-height: 48px; min-width: 44px; border: 0; border-radius: 10px; font-size: 16px; font-weight: 600; background: #2563eb; color: #fff; padding: 8px 14px; }
 button:disabled { background: #334155; color: #64748b; }
 button:active:not(:disabled) { transform: scale(.97); }
-.tap { width: 100%; min-height: 56px; font-size: 18px; background: #16a34a; }
+.tap { background: #16a34a; }
 .up { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; margin-bottom: 6px; background: #334155; }
 .up:disabled { opacity: .6; }
 .up small { display: block; font-weight: 400; color: #cbd5e1; }
@@ -53,6 +65,8 @@ small { color: #94a3b8; }
 .modal { background: #7f1d1d; border: 3px solid #f87171; border-radius: 16px; max-width: 420px; width: 100%; padding: 20px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
 .modal h3 { margin: 0 0 12px; font-size: 24px; }
 .modal p { margin: 0 0 18px; font-size: 16px; line-height: 1.45; color: #fee2e2; }
+.modal.good { background: #14532d; border-color: #4ade80; }
+.modal.good .modal-ok { background: #16a34a; }
 .modal-ok { width: 100%; min-height: 52px; background: #dc2626; font-size: 18px; }
 
 .map-night { position: absolute; inset: 0; background: rgba(10, 16, 48, .4); opacity: 0; transition: opacity 1.5s; pointer-events: none; }
