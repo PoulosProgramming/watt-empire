@@ -46,6 +46,6 @@ Zapisuj sem, co ukázalo hraní, ať další agent ví, proč je hra nastavená 
 - **Baterie** dlouho nic nepřinášela (přebytek se prostě ztrácel). Zvětšena na 10 MWh/úroveň. Vyplatí se až při výkonu nad ~8 MW, kam hráč v kapitole 1 dojde pozdě. Zkontrolovat v dalším testu.
 - **Klikání vs. mapa:** teď hráč 100× klikne na tlačítko. Na mapě (krok 3) musí odpad najít a sebrat, což bude pomalejší. Až bude mapa, přeladit ceny brigádníků a sběr, aby 5 min ručního sběru zůstalo stejně dlouhých.
 - **Ztráta postupu po obnovení stránky** hráče naštvala, proto se ukládá už teď (předčasně před krokem 5). V ladění je tlačítko „Smazat postup".
-- **Postupné odemykání:** vylepšení mají podmínku `unlock` v `balance.ts` (např. brigádníci po 200 odklikaných VO) a úkoly se zobrazují po třech (`QUESTS_VISIBLE`). Pořadí úkolů musí odpovídat odemykání, aby žádný úkol nečekal na zamčené vylepšení bez důvodu.
+- **Postupné odemykání:** vylepšení mají podmínku `unlock` v `balance.ts` (např. brigádníci až po 2 upgradech výkonu spalovny, takže hráč první minuty jen klikne) a úkoly se zobrazují po třech (`QUESTS_VISIBLE`). Pořadí úkolů musí odpovídat odemykání, aby žádný úkol nečekal na zamčené vylepšení bez důvodu.
 - **Karta ⚡** ukazuje bilanci výkonu (výroba, baterie, mařič, ztráty, dodávka vs. co město chce), ne celkově dodané MWh (to je jen malá poznámka v rozpisu).
 - **Nevyřešeno:** čím se bude zvedat spotřeba města (budovy klikem, růst jen při online hraní, viz GDD sekce 9).

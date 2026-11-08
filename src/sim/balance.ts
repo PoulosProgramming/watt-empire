@@ -74,7 +74,7 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 500, growth: 1.45, maxLevel: 10, unlock: { kind: 'taps', target: 200, text: 'po 200 odklikaných VO' } },
+  { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 500, growth: 1.45, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 2, text: 'po 2 upgradech výkonu spalovny' } },
   { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz, ale v noci hrozí přebytek)', baseCost: 300, growth: 1.8, maxLevel: 7, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' } },
   { id: 'efficiency', name: 'Účinnost spalovny', description: 'Z méně VO více energie', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' } },
   { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
@@ -96,10 +96,9 @@ export const QUESTS_VISIBLE = 3;
 export const QUESTS: QuestDef[] = [
   { id: 'deliver1', text: 'Dodej městu 1 MWh', kind: 'delivered', target: 1, reward: 20 },
   { id: 'tap25', text: 'Vyčisti 25 odpadků (ruční tapy)', kind: 'taps', target: 25, reward: 30 },
-  { id: 'tap200', text: 'Vyčisti 200 odpadků (odemkne brigádníky)', kind: 'taps', target: 200, reward: 60 },
+  { id: 'power2', text: 'Zvyš výkon spalovny na úroveň 2 (5 MW)', kind: 'upgrade', upgrade: 'power', target: 2, reward: 300 },
   { id: 'worker3', text: 'Najmi 3 brigádníky', kind: 'upgrade', upgrade: 'worker', target: 3, reward: 80 },
   { id: 'deliver30', text: 'Dodej městu 30 MWh', kind: 'delivered', target: 30, reward: 150 },
-  { id: 'power2', text: 'Zvyš výkon spalovny na úroveň 2 (5 MW)', kind: 'upgrade', upgrade: 'power', target: 2, reward: 300 },
   { id: 'dump1', text: 'Kup mařič přebytku (odvede přebytek v noci)', kind: 'upgrade', upgrade: 'dump', target: 1, reward: 400 },
   { id: 'battery1', text: 'Kup první baterii', kind: 'upgrade', upgrade: 'battery', target: 1, reward: 500 },
   { id: 'deliver100', text: 'Dodej městu 100 MWh', kind: 'delivered', target: 100, reward: 600 },
