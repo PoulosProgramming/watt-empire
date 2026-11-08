@@ -240,3 +240,17 @@ describe('rozsah spotřeby města', () => {
     expect(cityDemandRangeMW(s).min).toBeCloseTo(7 * 1.25, 5);
   });
 });
+
+describe('krize v rozpisu příjmů', () => {
+  it('ztráta z krize se počítá zvlášť a součet sedí', () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id);
+    s.delivered = TOXIC_CRISIS_MWH;
+    s.vo = 100;
+    tick(s);
+    expect(s.toxic).toBe(true);
+    const full = s.live.incomePerSecond + s.live.crisisLossPerSecond;
+    expect(s.live.crisisLossPerSecond).toBeGreaterThan(0);
+    expect(s.live.incomePerSecond / full).toBeCloseTo(0.6, 5);
+  });
+});

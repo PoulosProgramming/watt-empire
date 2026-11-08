@@ -148,11 +148,12 @@ function render(): void {
   let detail = '';
   if (openStat === 'credits') {
     detail =
-      line('Prodej energie městu', `+${fmt(l.incomePerSecond, 2)}/s`, 'plus') +
+      line('Prodej energie městu (běžná cena)', `+${fmt(l.incomePerSecond + l.crisisLossPerSecond, 2)}/s`, 'plus') +
+      (s.toxic ? line('☣️ Ekologická krize (město platí jen ' + Math.round(TOXIC_INCOME_FACTOR * 100) + ' %)', `−${fmt(l.crisisLossPerSecond, 2)}/s`, 'minus') : '') +
       line('Mzdy brigádníků', `−${fmt(l.wagePerSecond, 2)}/s`, 'minus') +
       line('Mařič přebytku', `−${fmt(l.dumpCostPerSecond, 2)}/s`, 'minus') +
       line('Celkem', signed(net), 'total') +
-      (s.toxic ? `<small>☣️ Krize: město platí jen ${Math.round(TOXIC_INCOME_FACTOR * 100)} %.</small>` : '');
+      (s.toxic ? '<small>Krizi vyřeší až kapitola 2 (likvidátor odpadu).</small>' : '');
   } else if (openStat === 'energy') {
     const toBattery = Math.max(0, l.batteryFlowMW);
     const fromBattery = Math.max(0, -l.batteryFlowMW);

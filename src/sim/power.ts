@@ -70,6 +70,7 @@ export function runPower(s: GameState, dt: number): void {
     live.wastedMW = 0;
     live.dumpedMW = 0;
     live.incomePerSecond = 0;
+    live.crisisLossPerSecond = 0;
     live.dumpCostPerSecond = 0;
     live.voBurnedPerSecond = 0;
     return;
@@ -160,5 +161,6 @@ export function runPower(s: GameState, dt: number): void {
   live.dumpCostPerSecond = (dumped / SECONDS_PER_GAME_HOUR) * DUMP_COST_PER_MWH;
   live.voBurnedPerSecond = voBurned;
   live.incomePerSecond = (toCity / SECONDS_PER_GAME_HOUR) * creditsPerMWh;
+  live.crisisLossPerSecond = (toCity / SECONDS_PER_GAME_HOUR) * (CREDITS_PER_MWH - creditsPerMWh);
 }
 
