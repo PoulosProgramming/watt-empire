@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CHAPTER1_END_QUESTS, CONTRACT_MW, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
+import { CHAPTER_END_QUESTS, CONTRACT_MW, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
+import { solarMW } from '../src/sim/power';
 import { runCrisis } from '../src/sim/quests';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
@@ -46,6 +47,21 @@ describe('ekonomika', () => {
   });
 });
 
+
+// Polední špička ze slunce (kapitola 3) je jediné, co teď přetěžuje síť: 10 MW ze slunce na vedení 6 MW.
+const solarPeak = () => {
+  const s = newGame();
+  s.doneQuests = QUESTS.map((q) => q.id);
+  s.chapter = 3;
+  s.toxic = true; // krize už proběhla
+  s.hour = 12;
+  s.incineratorOn = false; // jen slunce
+  s.upgrades.solar = 5; // 10 MW v poledne
+  s.upgrades.line = 0; // vedení 6 MW => přebytek 4 MW
+  s.credits = 500;
+  return s;
+};
+
 describe('síť', () => {
   it('spalovna vyrobí z 5 VO 1 MWh a město zaplatí 10 kreditů', () => {
     const s = newGame();
@@ -58,16 +74,11 @@ describe('síť', () => {
     expect(50 - s.vo).toBeGreaterThanOrEqual(s.delivered * 5 - 1e-9); // spáleno aspoň tolik, kolik se dodalo
   });
 
-  it('bez baterie noc přetíží síť a nastane blackout s poplatkem', () => {
-    const s = newGame();
-    s.hour = 20; // noc
-    s.upgrades.power = 7;
-    s.doneQuests = QUESTS.map((q) => q.id);
-    s.vo = 10000;
-    s.credits = 500;
+  it('bez baterie a mařiče polední špička ze slunce přetíží síť a nastane blackout s poplatkem', () => {
+    const s = solarPeak();
     let blackout = false;
     for (let i = 0; i < 20 / TICK_DT; i++) {
-      s.vo = 10000;
+      s.hour = 12; // drž poledne
       tick(s);
       if (s.blackout > 0) blackout = true;
     }
@@ -76,13 +87,26 @@ describe('síť', () => {
     expect(s.credits).toBeGreaterThanOrEqual(0);
   });
 
-  it('baterie ukládá přebytek v noci', () => {
+  it('spalovna výkon nad vedení neposkytne: žádné přetížení a blackout z nadvýroby spalovny', () => {
     const s = newGame();
-    s.hour = 20;
-    s.upgrades.power = 7;
-    s.upgrades.battery = 5;
+    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => !CHAPTER_END_QUESTS[1].includes(id));
+    s.upgrades.power = 8; // 11 MW, ale vedení jen 6 MW
     s.vo = 10000;
-    run(s, 2);
+    for (let i = 0; i < 20 / TICK_DT; i++) {
+      s.vo = 10000;
+      tick(s);
+      expect(s.blackout).toBe(0);
+      expect(s.live.productionMW).toBeLessThanOrEqual(6 + 1e-9);
+    }
+  });
+
+  it('baterie uloží přebytek ze slunce a síť nevypadne', () => {
+    const s = solarPeak();
+    s.upgrades.battery = 5;
+    for (let i = 0; i < 4 / TICK_DT; i++) {
+      s.hour = 12;
+      tick(s);
+    }
     expect(s.battery).toBeGreaterThan(0);
     expect(s.blackout).toBe(0);
   });
@@ -135,60 +159,57 @@ describe('spalovna', () => {
     }
   });
 
-  it('mařič odvede přebytek za peníze a nejde do mínusu', () => {
-    const s = newGame();
-    s.hour = 20;
-    s.upgrades.power = 6; // 9 MW proti 7 MW v noci
-    s.upgrades.dump = 1; // 2 MW
-    s.vo = 10000;
+  it('mařič odvede přebytek ze slunce za peníze a nejde do mínusu', () => {
+    const s = solarPeak();
+    s.upgrades.dump = 2; // 4 MW
     s.credits = 100;
-    run(s, 3);
+    for (let i = 0; i < 3 / TICK_DT; i++) {
+      s.hour = 12;
+      tick(s);
+    }
     expect(s.blackout).toBe(0);
     expect(s.live.dumpedMW).toBeGreaterThan(0);
     s.credits = 0;
-    run(s, 20);
+    for (let i = 0; i < 20 / TICK_DT; i++) {
+      s.hour = 12;
+      tick(s);
+    }
     expect(s.credits).toBeGreaterThanOrEqual(0);
   });
 
-  // Mechanismus krize je nachystaný pro kapitolu 2 (spouštěcí úkol je teď null), testuje se se zadaným úkolem
-  const TRIGGER = 'line2';
-
-  it('v kapitole 1 se krize nespouští (spouštěcí úkol je null)', () => {
-    expect(TOXIC_TRIGGER_QUEST).toBeNull();
+  it('v kapitole 1 se krize nespouští', () => {
     const s = newGame();
-    s.doneQuests = QUESTS.map((q) => q.id);
+    s.doneQuests = QUESTS.filter((q) => !CHAPTER_END_QUESTS[1].includes(q.id)).map((q) => q.id);
     s.vo = 100;
-    s.delivered = 1000;
     run(s, 60);
+    expect(s.chapter).toBe(1);
     expect(s.toxic).toBe(false);
     expect(s.toxicCountdown).toBe(-1);
   });
 
-  it('po splnění spouštěcího úkolu začne odpočet a krize se spustí sama za 15 s', () => {
+  it('po začátku kapitoly 2 začne odpočet a krize se spustí sama za 15 s s hromadou odpadu na poli', () => {
     const s = newGame();
-    s.doneQuests = [TRIGGER];
-    runCrisis(s, TICK_DT, TRIGGER);
+    s.chapter = 2;
+    runCrisis(s, TICK_DT);
     expect(s.toxic).toBe(false);
     expect(s.toxicCountdown).toBeGreaterThan(0);
-    for (let t = 0; t < TOXIC_DELAY_SECONDS - 1; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
+    for (let t = 0; t < TOXIC_DELAY_SECONDS - 1; t += TICK_DT) runCrisis(s, TICK_DT);
     expect(s.toxic).toBe(false);
-    for (let t = 0; t < 2; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
+    for (let t = 0; t < 2; t += TICK_DT) runCrisis(s, TICK_DT);
     expect(s.toxic).toBe(true);
     expect(s.toxicCountdown).toBe(-1);
+    expect(s.toxicField).toBe(TOXIC_INITIAL_FIELD);
   });
 
-  it('bez spouštěcího úkolu krize nezačne ani se zadaným spouštěčem', () => {
-    const s = newGame();
-    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== TRIGGER);
-    for (let t = 0; t < 60; t += TICK_DT) runCrisis(s, TICK_DT, TRIGGER);
-    expect(s.toxic).toBe(false);
-  });
-
-  it('starší uložení s už spuštěnou krizí se při načtení vyčistí', () => {
+  it('starší uložení z kapitoly 1 s už spuštěnou krizí se při načtení vyčistí, z kapitoly 2 ne', () => {
     const old = JSON.stringify({ v: 1, state: { credits: 5, toxic: true, toxicCountdown: 3 } });
     const s = deserialize(old)!;
     expect(s.toxic).toBe(false);
     expect(s.toxicCountdown).toBe(-1);
+    const ch2 = JSON.stringify({ v: 1, state: { credits: 5, chapter: 2, toxic: true, toxicField: 50 } });
+    const s2 = deserialize(ch2)!;
+    expect(s2.toxic).toBe(true);
+    expect(s2.toxicField).toBe(50);
   });
 
   it('autonomie: 5 brigádníků stačí na 6 MW, 4 ne', () => {
@@ -321,7 +342,7 @@ describe('smlouva na stálých 15 MW', () => {
   });
 
   it('kapitola 1 končí smlouvou a 500 MWh, ne jen jedním z toho', () => {
-    expect(CHAPTER1_END_QUESTS).toEqual(['contract', 'deliver400']);
+    expect(CHAPTER_END_QUESTS[1]).toEqual(['contract', 'deliver400']);
     const contract = QUESTS.find((q) => q.id === 'contract')!;
     const mwh = QUESTS.find((q) => q.id === 'deliver400')!;
     expect(contract.kind).toBe('contract');
@@ -340,7 +361,9 @@ describe('krize v rozpisu příjmů', () => {
   it('ztráta z krize se počítá zvlášť a součet sedí', () => {
     const s = newGame();
     s.doneQuests = QUESTS.map((q) => q.id);
+    s.chapter = 2;
     s.toxic = true;
+    s.toxicField = TOXIC_FIELD_FULL; // plná hromada odpadu na poli => město platí 60 %
     s.vo = 100;
     s.upgrades.worker = 5;
     s.credits = 100;
@@ -493,14 +516,14 @@ describe('brigádníci', () => {
 
 describe('pořadí úkolů', () => {
   it('line2 je 15. hlavní úkol a účinnost má v hlavním řetězci tři úkoly před ním', () => {
-    const main = QUESTS.filter((q) => !q.ongoing);
+    const main = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) === 1);
     expect(main[14].id).toBe('line2');
     const beforeTrigger = main.slice(0, 14).filter((q) => q.upgrade === 'efficiency').length;
     expect(beforeTrigger).toBe(3);
   });
 
-  it('mařič a baterie už nejsou v hlavním řetězci', () => {
-    const main = QUESTS.filter((q) => !q.ongoing);
+  it('mařič a baterie už nejsou v hlavním řetězci kapitoly 1', () => {
+    const main = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) === 1);
     expect(main.some((q) => q.upgrade === 'dump' || q.upgrade === 'battery')).toBe(false);
   });
 
@@ -511,5 +534,200 @@ describe('pořadí úkolů', () => {
         expect(q.target).toBeLessThanOrEqual(def.maxLevel);
       }
     }
+  });
+});
+
+// ---------------- Kapitoly 2 a 3 ----------------
+describe('postup kapitol', () => {
+  it('po splnění závěrečných úkolů kapitoly 1 se začne kapitola 2, pak 3, a tam to končí', () => {
+    const s = newGame();
+    s.doneQuests = [...CHAPTER_END_QUESTS[1]];
+    tick(s);
+    expect(s.chapter).toBe(2);
+    s.doneQuests.push(...CHAPTER_END_QUESTS[2]);
+    tick(s);
+    expect(s.chapter).toBe(3);
+    s.doneQuests.push(...CHAPTER_END_QUESTS[3]);
+    tick(s);
+    expect(s.chapter).toBe(3); // dál zatím nic (kapitoly 4 a 5 jsou jen plán)
+  });
+
+  it('úkoly pozdějších kapitol se nesplní předčasně', () => {
+    const s = newGame();
+    s.upgrades.cleanup = 3; // splňuje úkoly kapitoly 2, ale jsme v kapitole 1
+    tick(s);
+    expect(s.doneQuests).not.toContain('c2_cleanup');
+    s.chapter = 2;
+    tick(s);
+    expect(s.doneQuests).toContain('c2_cleanup');
+  });
+
+  it('každá kapitola má závěrečný úkol v seznamu a úkoly kapitol jdou za sebou', () => {
+    for (const ends of Object.values(CHAPTER_END_QUESTS)) for (const id of ends) expect(QUESTS.some((q) => q.id === id)).toBe(true);
+    const chapters = QUESTS.filter((q) => !q.ongoing).map((q) => q.chapter ?? 1);
+    expect([...chapters].sort((a, b) => a - b)).toEqual(chapters);
+  });
+});
+
+describe('kapitola 2: odpad', () => {
+  const ch2 = () => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id); // ať úkoly nevyplatí kredity
+    s.chapter = 2;
+    s.toxic = true;
+    s.upgrades.power = 2; // 5 MW
+    s.upgrades.line = 1;
+    s.vo = 1000;
+    s.credits = 10000;
+    return s;
+  };
+
+  it('po krizi ze spalovny vzniká odpad: nejdřív do skladu, co se nevejde, leží na poli', () => {
+    const s = ch2();
+    s.upgrades.storage = 1; // 150 j.
+    run(s, 30);
+    expect(s.toxicStored).toBeGreaterThan(0);
+    run(s, 300);
+    expect(s.toxicStored).toBeCloseTo(150, 5); // sklad je plný
+    expect(s.toxicField).toBeGreaterThan(0); // zbytek leží na poli
+  });
+
+  it('bez krize žádný odpad nevzniká', () => {
+    const s = ch2();
+    s.toxic = false;
+    run(s, 10); // krize začne až 15 s po začátku kapitoly
+    expect(s.toxic).toBe(false);
+    expect(s.toxicField).toBe(0);
+    expect(s.toxicStored).toBe(0);
+  });
+
+  it('město platí míň, dokud leží odpad na poli (0 j. = plná cena, plné pole = 60 %)', () => {
+    const s = ch2();
+    s.toxicField = 0;
+    tick(s);
+    expect(s.live.priceFactor).toBeCloseTo(1, 5);
+    s.toxicField = TOXIC_FIELD_FULL * 5;
+    tick(s);
+    expect(s.live.priceFactor).toBeCloseTo(0.6, 5);
+  });
+
+  it('likvidátor ničí odpad z pole, stojí peníze a nikdy nejde do mínusu', () => {
+    const s = ch2();
+    s.toxicField = 100;
+    s.upgrades.cleanup = 2; // 1 j/s
+    run(s, 10);
+    expect(s.toxicDisposed).toBeGreaterThan(5);
+    expect(s.live.disposeCostPerSecond).toBeGreaterThan(0);
+    // bez peněz (a bez příjmu ze spalovny) se neničí
+    s.credits = 0;
+    s.incineratorOn = false;
+    s.vo = 0;
+    const before = s.toxicDisposed;
+    run(s, 10);
+    expect(s.credits).toBeGreaterThanOrEqual(0);
+    expect(s.toxicDisposed - before).toBeLessThan(1);
+  });
+
+  it('úkol "vyčisti pole" se splní, až když je pole prázdné po likvidaci', () => {
+    const s = ch2();
+    s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== 'c2_field');
+    s.toxicField = 5;
+    s.upgrades.cleanup = 8;
+    s.incineratorOn = false; // ať nové odpadky nevznikají
+    tick(s);
+    expect(s.doneQuests).not.toContain('c2_field');
+    run(s, 30);
+    expect(s.toxicField).toBeLessThan(0.5);
+    expect(s.doneQuests).toContain('c2_field');
+  });
+
+  it('od kapitoly 2 město bere všechno, co unese vedení (čím víc vyrábíš, tím víc odebírá)', () => {
+    const s = newGame();
+    s.chapter = 2;
+    s.upgrades.line = 2;
+    tick(s);
+    expect(s.live.demandMW).toBeCloseTo(12, 5);
+    s.upgrades.line = 4;
+    tick(s);
+    expect(s.live.demandMW).toBeCloseTo(18, 5);
+  });
+});
+
+describe('kapitola 3: čistý zdroj a důvěra', () => {
+  const ch3 = (hour: number) => {
+    const s = newGame();
+    s.doneQuests = QUESTS.map((q) => q.id);
+    s.chapter = 3;
+    s.hour = hour;
+    s.upgrades.power = 1;
+    s.upgrades.line = 3;
+    s.upgrades.solar = 5; // 10 MW špičkově
+    s.toxic = true; // krize už proběhla (ať se v testu nespouští znovu)
+    s.toxicField = 0;
+    s.incineratorOn = false; // ať ze spalovny nevzniká odpad; ve zkoušce slunce stačí
+    s.vo = 1000;
+    s.credits = 10000;
+    return s;
+  };
+
+  it('sluneční panely vyrábějí jen ve dne a nejvíc v poledne', () => {
+    const s = ch3(12);
+    expect(solarMW(s)).toBeCloseTo(10, 5);
+    s.hour = 8;
+    expect(solarMW(s)).toBeGreaterThan(0);
+    expect(solarMW(s)).toBeLessThan(10);
+    s.hour = 22;
+    expect(solarMW(s)).toBe(0);
+  });
+
+  it('čistá energie ze slunce zvedá důvěru veřejnosti', () => {
+    const s = ch3(12);
+    run(s, 20);
+    expect(s.trust).toBeGreaterThan(0);
+    const t0 = s.trust;
+    s.hour = 22; // v noci slunce nesvítí
+    run(s, 5);
+    expect(s.trust).toBeCloseTo(t0, 1);
+  });
+
+  it('odpad na poli důvěru snižuje a důvěra se drží mezi 0 a 100', () => {
+    const s = ch3(22);
+    s.toxic = true;
+    s.toxicField = TOXIC_FIELD_FULL;
+    s.incineratorOn = false;
+    s.trust = 50;
+    run(s, 20);
+    expect(s.trust).toBeLessThan(50);
+    s.toxicField = 0;
+    s.trust = 99.99;
+    s.hour = 12;
+    run(s, 60);
+    expect(s.trust).toBeLessThanOrEqual(100);
+    s.trust = 0;
+    s.toxicField = TOXIC_FIELD_FULL;
+    s.hour = 22;
+    run(s, 10);
+    expect(s.trust).toBeGreaterThanOrEqual(0);
+  });
+
+  it('vysoká důvěra zvedá cenu (až o 20 %)', () => {
+    const s = ch3(12);
+    s.trust = 100;
+    tick(s);
+    expect(s.live.priceFactor).toBeCloseTo(1.2, 5);
+  });
+
+  it('polední špička ze slunce přetíží slabé vedení (proto je v kapitole 3 baterie a silnější vedení)', () => {
+    const s = ch3(12);
+    s.upgrades.line = 0; // vedení 6 MW
+    s.upgrades.power = 12; // 15 MW ze spalovny + 10 MW ze slunce
+    s.incineratorOn = true;
+    let blackout = false;
+    for (let i = 0; i < 20 / TICK_DT; i++) {
+      s.vo = 10000;
+      tick(s);
+      if (s.blackout > 0) blackout = true;
+    }
+    expect(blackout).toBe(true);
   });
 });

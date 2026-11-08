@@ -29,3 +29,10 @@ export function advanceTime(s: GameState, dt: number): void {
 export function baseDemandMW(hour: number): number {
   return CITY_BASE_DEMAND_MW * demandFactor(hour);
 }
+
+// Slunce: ve dne plynule stoupá k poledni a klesá, v noci je nula (0 až 1).
+export function sunFactor(hour: number): number {
+  if (!isDay(hour)) return 0;
+  const t = (hour - DAY_START_HOUR) / (NIGHT_START_HOUR - DAY_START_HOUR);
+  return Math.sin(Math.PI * t);
+}

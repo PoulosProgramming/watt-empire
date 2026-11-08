@@ -51,26 +51,38 @@ export const OVERLOAD_TOLERANCE_SECONDS = 4; // jak dlouho síť snese přebytek
 export const BLACKOUT_SECONDS = 15;
 export const BLACKOUT_FEE = 60; // poplatek za nahození (nikdy nejde do mínusu)
 
-// ---- Ekologická krize (kapitola 1) ----
-// Ekologická krize je nachystaná pro kapitolu 2. V kapitole 1 se nespouští (null), hráč řekl, že hru moc zpomalovala.
-// Až bude kapitola 2, nastav sem id úkolu, po jehož splnění krize začne.
-export const TOXIC_TRIGGER_QUEST: string | null = null;
-export const TOXIC_DELAY_SECONDS = 15; // krize se spustí sama za tolik sekund (bez předchozího varování)
+// ---- Kapitola 2: odpad a krize ----
+// Krize začne sama (bez varování, s velkým popupem) TOXIC_DELAY_SECONDS po začátku kapitoly TOXIC_TRIGGER_CHAPTER.
+export const TOXIC_TRIGGER_CHAPTER = 2;
+export const TOXIC_DELAY_SECONDS = 15;
 export const TOXIC_POPUP_TITLE = '☣️ Ekologická katastrofa!';
 export const TOXIC_POPUP_TEXT =
-  'Přetížená spalovna se zadrhla a vyplivla na pláž toxický odpad. Město je vyděšené a platí za proud jen 60 %. Vyčistit ostrov zvládneš až s vědeckou laboratoří v kapitole 2. Do té doby drž síť v chodu a vydělávej dál.';
-export const TOXIC_INCOME_FACTOR = 0.6; // během krize město platí jen 60 % (řeší se až v kapitole 2)
+  'Přetížená spalovna se zadrhla a vyplivla na pláž toxický odpad. Lidé se bouří a město odmítá platit plnou cenu za špinavou energii. Odpad musíš zlikvidovat, nebo aspoň uskladnit, a už ho nevyhazovat na pole. Čím víc ho ležíš na poli, tím míň ti město zaplatí.';
+export const TOXIC_INITIAL_FIELD = 200; // jednotek toxického odpadu na poli na začátku krize
+export const TOXIC_PER_MWH = 2; // jednotek odpadu na každou MWh vyrobenou spalovnou (po krizi)
+export const TOXIC_FIELD_FULL = 200; // při tolika jednotkách na poli město platí nejméně
+export const TOXIC_INCOME_FACTOR = 0.6; // nejnižší podíl ceny, který město zaplatí (−40 %)
+export const DISPOSE_PER_LEVEL = 0.5; // likvidátor: jednotek odpadu za sekundu na úroveň
+export const DISPOSE_COST_PER_UNIT = 3; // likvidace stojí kredity za každou jednotku
+export const STORAGE_PER_LEVEL = 150; // sklad toxického odpadu: jednotek na úroveň (bezpečně uložených)
+
+// ---- Kapitola 3: čistý zdroj a důvěra ----
+export const SOLAR_MW_PER_LEVEL = 2; // sluneční panely: špičkový výkon na úroveň (jen ve dne)
+export const TRUST_PER_CLEAN_MWH = 0.6; // důvěra (v %) za každou MWh z čistého zdroje
+export const TRUST_PER_DISPOSED = 0.01; // důvěra (v %) za každou zlikvidovanou jednotku odpadu
+export const TRUST_DRAIN_PER_SECOND = 0.03; // důvěra klesá, dokud leží odpad na poli (násobeno zaplněností pole)
+export const TRUST_PRICE_BONUS = 0.2; // při 100 % důvěře město platí o 20 % víc
 
 // ---- Prestiž ----
 // Dodané MWh potřebné pro prestiž 2, 3, 4 ... (kapitola 1 končí prestiží 2 po 500 MWh, GDD původně 100)
 export const PRESTIGE_THRESHOLDS_MWH = [0, 500, 1200, 2800, 6500];
 
 // ---- Vylepšení ----
-export type UpgradeId = 'worker' | 'power' | 'efficiency' | 'line' | 'battery' | 'dump' | 'regulator';
+export type UpgradeId = 'worker' | 'power' | 'efficiency' | 'line' | 'battery' | 'dump' | 'regulator' | 'cleanup' | 'storage' | 'solar';
 
 // Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu) | smlouva (dosažení smluvních MW) | kapitola
 export interface Requirement {
-  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter';
+  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter' | 'disposed' | 'fieldclean' | 'trust';
   target: number;
   upgrade?: UpgradeId; // jen pro kind 'upgrade'
 }
@@ -89,11 +101,14 @@ export interface UpgradeDef {
 // Brigádníci: bez pevného limitu (hráč chtěl "tolik, kolik můžeme"), omezuje je jen cena (každý další +30 %) a mzda.
 export const UPGRADES: UpgradeDef[] = [
   { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 175, growth: 1.3, maxLevel: Infinity, unlock: { kind: 'upgrade', upgrade: 'power', target: 1, text: 'po prvním upgradu výkonu spalovny' } },
-  { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz za dodanou energii)', baseCost: 300, growth: 1.28, maxLevel: 12, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' }, group: 'incinerator' },
+  { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz za dodanou energii)', baseCost: 300, growth: 1.28, maxLevel: 20, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' }, group: 'incinerator' },
   { id: 'efficiency', name: 'Účinnost spalovny', description: 'Stejný výkon za méně VO (−10 % spotřeby odpadu)', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' }, group: 'incinerator' },
   { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
   { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'chapter', target: 3, text: 'v kapitole 3 (až bude přebytek z obnovitelných zdrojů)' } },
   { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'chapter', target: 3, text: 'v kapitole 3 (s obnovitelnými zdroji)' } },
+  { id: 'cleanup', name: 'Likvidátor odpadu', description: 'Ničí 0,5 jednotky toxického odpadu za sekundu, každá jednotka stojí 3💰', baseCost: 2000, growth: 1.5, maxLevel: 8, unlock: { kind: 'chapter', target: 2, text: 'v kapitole 2 (po ekologické katastrofě)' } },
+  { id: 'storage', name: 'Sklad toxického odpadu', description: '+150 jednotek bezpečně uloženého odpadu (neleží na poli)', baseCost: 1500, growth: 1.5, maxLevel: 8, unlock: { kind: 'chapter', target: 2, text: 'v kapitole 2 (po ekologické katastrofě)' } },
+  { id: 'solar', name: 'Sluneční panely', description: '+2 MW čisté energie, ale jen ve dne', baseCost: 3000, growth: 1.45, maxLevel: 10, unlock: { kind: 'chapter', target: 3, text: 'v kapitole 3 (obnovitelné zdroje)' } },
   { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1, unlock: { kind: 'chapter', target: 4, text: 'v kapitole 4 (regulace)' }, group: 'incinerator' },
 ];
 
@@ -102,7 +117,8 @@ export interface QuestDef extends Requirement {
   id: string;
   text: string;
   reward: number;
-  ongoing?: boolean; // průběžný úkol: nepočítá se do kapitoly ani do spuštění krize, zobrazuje se zvlášť
+  ongoing?: boolean; // průběžný úkol: nepočítá se do kapitoly, zobrazuje se zvlášť
+  chapter?: number; // kapitola, do které úkol patří (výchozí 1); úkol se spustí až v této kapitole
 }
 
 // Kolik nejbližších nesplněných úkolů se hráči zobrazí (ostatní se odemykají postupně)
@@ -134,6 +150,22 @@ export const QUESTS: QuestDef[] = [
   { id: 'power12', text: 'Zvyš výkon spalovny na úroveň 12 (15 MW, smluvní výkon)', kind: 'upgrade', upgrade: 'power', target: 12, reward: 1500 },
   { id: 'contract', text: 'Splň smlouvu: dodej městu 15 MW', kind: 'contract', target: 1, reward: 5000 },
   { id: 'deliver400', text: 'Dodej městu 500 MWh (konec kapitoly 1)', kind: 'delivered', target: 500, reward: 2000 },
+  // --- Kapitola 2: odpad a krize ---
+  { id: 'c2_cleanup', chapter: 2, text: 'Zareaguj na katastrofu: kup likvidátor odpadu', kind: 'upgrade', upgrade: 'cleanup', target: 1, reward: 1500 },
+  { id: 'c2_storage', chapter: 2, text: 'Přestaň vyhazovat odpad na pole: kup sklad toxického odpadu', kind: 'upgrade', upgrade: 'storage', target: 1, reward: 1500 },
+  { id: 'c2_dispose300', chapter: 2, text: 'Zlikviduj 300 jednotek toxického odpadu', kind: 'disposed', target: 300, reward: 2500 },
+  { id: 'c2_field', chapter: 2, text: 'Vyčisti pole: ať na poli nezůstane žádný toxický odpad', kind: 'fieldclean', target: 1, reward: 3000 },
+  { id: 'c2_cleanup3', chapter: 2, text: 'Posil likvidaci: likvidátor odpadu na úroveň 3', kind: 'upgrade', upgrade: 'cleanup', target: 3, reward: 3500 },
+  { id: 'c2_power14', chapter: 2, text: 'Zvyš výkon spalovny na úroveň 14 (17 MW): čím víc vyrábíš, tím víc město odebírá', kind: 'upgrade', upgrade: 'power', target: 14, reward: 4000 },
+  { id: 'c2_dispose1500', chapter: 2, text: 'Zlikviduj celkem 1500 jednotek toxického odpadu (konec kapitoly 2)', kind: 'disposed', target: 1500, reward: 6000 },
+  // --- Kapitola 3: čistý zdroj a obnovitelné zdroje ---
+  { id: 'c3_solar', chapter: 3, text: 'První obnovitelný zdroj: kup sluneční panely', kind: 'upgrade', upgrade: 'solar', target: 1, reward: 5000 },
+  { id: 'c3_trust25', chapter: 3, text: 'Dej lidem důvod věřit: důvěra veřejnosti na 25 %', kind: 'trust', target: 25, reward: 6000 },
+  { id: 'c3_line5', chapter: 3, text: 'Posil dráty a trafo na úroveň 5 (21 MW, polední špičky ze slunce)', kind: 'upgrade', upgrade: 'line', target: 5, reward: 5000 },
+  { id: 'c3_battery', chapter: 3, text: 'Kup baterii, ať polední špička nepřetíží síť', kind: 'upgrade', upgrade: 'battery', target: 1, reward: 6000 },
+  { id: 'c3_solar5', chapter: 3, text: 'Sluneční elektrárna: sluneční panely na úroveň 5', kind: 'upgrade', upgrade: 'solar', target: 5, reward: 8000 },
+  { id: 'c3_trust60', chapter: 3, text: 'Důvěra veřejnosti na 60 %', kind: 'trust', target: 60, reward: 10000 },
+  { id: 'c3_trust100', chapter: 3, text: 'Přesvědč veřejnost, že jsme čistý zdroj: důvěra na 100 % (konec kapitoly 3)', kind: 'trust', target: 100, reward: 20000 },
   // --- Průběžné úkoly (nepovinné, ukážou se po autonomii) ---
   { id: 'o_eff4', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 4 (plný výkon 10 MW na 6 brigádníků)', kind: 'upgrade', upgrade: 'efficiency', target: 4, reward: 2500 },
   { id: 'o_worker6', ongoing: true, text: 'Najmi 6 brigádníků', kind: 'upgrade', upgrade: 'worker', target: 6, reward: 600 },
@@ -145,14 +177,31 @@ export const QUESTS: QuestDef[] = [
 ];
 
 
-// Kapitola 1 končí, když je splněna smlouva (15 MW) A zároveň dodáno aspoň CHAPTER1_END_MWH.
-export const CHAPTER1_END_QUESTS = ['contract', 'deliver400']; // smlouva a 500 MWh
+// ---- Kapitoly: kdy končí a jak se jmenují ----
+export const MAX_CHAPTER = 3; // kolik kapitol je zatím ve hře (4 a 5 jsou jen plán v GDD)
+// Kapitola končí, když jsou splněné všechny tyto úkoly. Kapitola 1: smlouva (15 MW) a zároveň 500 MWh.
+export const CHAPTER_END_QUESTS: Record<number, string[]> = {
+  1: ['contract', 'deliver400'],
+  2: ['c2_dispose1500'],
+  3: ['c3_trust100'],
+};
+export const CHAPTER_TITLES: Record<number, string> = {
+  1: 'Smlouva na stálých 15 MW',
+  2: 'Odpad a krize',
+  3: 'Čistý zdroj',
+};
 
 // ---- Příběh (zatím jen text, postavy a dialogy přijdou v kroku 4) ----
 export const STORY_INTRO =
   'Zamořený ostrov. Jediná věc, která tu ještě funguje, je stará spalovna odpadu. Městečko za kopcem je bez proudu a starosta tě prosí: roztoč spalovnu a dodej městu elektřinu. Nasmlouvali jste stálou dodávku 15 MW, den i noc. Zatím máš jen zlomek, tak začni.';
-export const STORY_CHAPTER_END =
-  'Město svítí a ostrov dýchá. Regulátor drží síť sám a tobě zbývá jen hlídat peníze. Jenže stará spalovna pálí odpad dál a pod hladinou se probouzí něco většího. Konec kapitoly 1. V kapitole 2 přijde laboratoř, likvidátor odpadu a první soláry. Zatím jde hra dál ladit: dohraj poslední úkoly a pošli, co ti vadilo.';
+export const CHAPTER_END_TEXT: Record<number, string> = {
+  1: 'Smlouva je splněná, město svítí. Jenže stará spalovna pálí odpad dál a pod povrchem se něco děje. Konec kapitoly 1. Přichází problém, který ostrov nenechá klidným.',
+  2: 'Pole je čisté a odpad pod kontrolou. Lidé se uklidnili, ale pořád ti nevěří. Konec kapitoly 2. Teď musíš veřejnost přesvědčit, že jsi čistý zdroj.',
+  3: 'Veřejnost ti věří a ostrov září čistou energií. Konec kapitoly 3. Přijde regulace a další velký zlom, ale to už je jiná kapitola (zatím není ve hře).',
+};
+export const CHAPTER_START_TEXT: Record<number, string> = {
+  3: 'Ostrov je čistý, ale lidé ti pořád nevěří. Odemykají se obnovitelné zdroje, začni slunečními panely. Čím víc čisté energie dodáš, tím víc ti město bude věřit a tím víc ti zaplatí. Pozor na polední špičky ze slunce: vedení je musí unést.',
+};
 
 // ---- Mapa (jen vzhled, simulace o ní neví) ----
 export const MAP_GRID_SIZE = 20; // mřížka 20×20 dlaždic

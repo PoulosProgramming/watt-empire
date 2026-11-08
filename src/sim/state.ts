@@ -20,6 +20,10 @@ export interface GameState {
   contractMet: boolean; // splněna smlouva (město aspoň jednou dostalo smluvních MW)
   toxic: boolean; // ekologická krize začala (toxický odpad)
   toxicCountdown: number; // sekundy do spuštění krize (-1 = odpočet neběží)
+  toxicField: number; // toxický odpad na poli (snižuje cenu energie)
+  toxicStored: number; // toxický odpad bezpečně ve skladu
+  toxicDisposed: number; // kolik jednotek odpadu se celkem zlikvidovalo
+  trust: number; // důvěra veřejnosti 0 až 100 (od kapitoly 3)
   doneQuests: string[];
   // hodnoty z posledního tiku (jen pro zobrazení)
   live: {
@@ -40,6 +44,10 @@ export interface GameState {
     autonomous: boolean; // brigádníci stačí zásobit spalovnu (hráč nemusí klikat)
     voPerSecond: number;
     workersPaused: boolean;
+    solarMW: number; // výkon sluneční elektrárny právě teď
+    disposePerSecond: number; // jednotek odpadu zlikvidovaných za sekundu
+    disposeCostPerSecond: number; // cena likvidace za sekundu
+    priceFactor: number; // podíl plné ceny, který město platí
   };
 }
 
@@ -51,7 +59,7 @@ export function newGame(): GameState {
     day: 1,
     taps: 0,
     delivered: 0,
-    upgrades: { worker: 0, power: 0, efficiency: 0, line: 0, battery: 0, dump: 0, regulator: 0 },
+    upgrades: { worker: 0, power: 0, efficiency: 0, line: 0, battery: 0, dump: 0, regulator: 0, cleanup: 0, storage: 0, solar: 0 },
     incineratorOn: true,
     incineratorRunning: false,
     incineratorLevel: 1,
@@ -63,6 +71,10 @@ export function newGame(): GameState {
     contractMet: false,
     toxic: false,
     toxicCountdown: -1,
+    toxicField: 0,
+    toxicStored: 0,
+    toxicDisposed: 0,
+    trust: 0,
     doneQuests: [],
     live: {
       productionMW: 0,
@@ -82,6 +94,10 @@ export function newGame(): GameState {
       autonomous: false,
       voPerSecond: 0,
       workersPaused: false,
+      solarMW: 0,
+      disposePerSecond: 0,
+      disposeCostPerSecond: 0,
+      priceFactor: 1,
     },
   };
 }

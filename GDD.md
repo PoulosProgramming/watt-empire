@@ -50,7 +50,7 @@ Přijde problém: **odpad ze spalovny**. Lidé se bouří, město platí méně 
 
 - Hráč začne odpad **likvidovat a rozebírat** (v budoucnu merge minihra), pak ho **uskladňovat a nevyhazovat na pole**.
 - **Regulace stále není potřeba:** čím víc se vyrábí, tím víc město odebírá, byť za snížený poplatek.
-- Ekologická katastrofa (toxický odpad 2×2 na mapě, velký popup, příjem 60 %) je v kódu nachystaná, spouští se až tady.
+- Ekologická katastrofa (toxický odpad na mapě, velký popup) se spouští 15 s po začátku kapitoly. **První verze v kódu:** odpad ze spalovny se ukládá do skladu nebo leží na poli (snižuje cenu až o 40 %); likvidátor ho ničí za peníze; od kapitoly 2 město bere vše, co unese vedení.
 
 ### Kapitola 3: Čistý zdroj a obnovitelné zdroje
 
@@ -58,6 +58,7 @@ Přijde problém: **odpad ze spalovny**. Lidé se bouří, město platí méně 
 - Vytříděný toxický odpad něco stojí a začne zabírat vzácnou hrací plochu; vyčistit ji stojí hodně peněz.
 - **Odemykají se obnovitelné zdroje (OZE):** soláry (panely 1×1 lepené k sobě, přes střídač s trafem, jen ve dne), hory (rozbitá přehrada, vyrábí 24/7, drahé vysoké napětí) a oceán (offshore vítr, výkon kolísá).
 - Odemykají se také **baterie** a **mařič přebytku** (s OZE vznikají přebytky).
+- **První verze v kódu:** sluneční panely (jen ve dne), důvěra veřejnosti (roste s čistou energií a likvidací odpadu, klesá s odpadem na poli; při 100 % město platí o 20 % víc). Polední špička ze slunce přetěžuje vedení, proto je potřeba vedení, baterie a mařič. Hory a oceán zatím nejsou.
 
 ### Kapitola 4: Regulace
 

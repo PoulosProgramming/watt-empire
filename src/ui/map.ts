@@ -22,7 +22,28 @@ export interface MapView {
   voMax: number;
   incomePerSecond: number;
   isNight: boolean;
+  toxic: boolean; // krize už začala
+  toxicField: number; // odpad na poli
+  toxicFieldFull: number; // při kolika jednotkách je pole „plné“ (město platí nejméně)
+  toxicStored: number;
+  storageCap: number;
+  solarLevel: number; // úroveň sluneční elektrárny (0 = nemáme)
+  solarMW: number; // výkon panelů právě teď
+  solarCapMW: number; // nejvyšší výkon panelů
 }
+
+// Místa kolem spalovny, kde se objevují hromady toxického odpadu (dlaždice)
+const WASTE_SPOTS = [
+  { x: 7, y: 8 },
+  { x: 7, y: 11 },
+  { x: 12, y: 8 },
+  { x: 8, y: 12 },
+  { x: 11, y: 12 },
+  { x: 6, y: 10 },
+  { x: 12, y: 11 },
+  { x: 10, y: 7 },
+];
+const SOLAR_TILE = { x: 3, y: 13 }; // sluneční panely vlevo dole (4×2 dlaždice)
 
 const T = MAP_TILE_PX;
 const N = MAP_GRID_SIZE;
@@ -50,6 +71,9 @@ class MapScene extends Phaser.Scene {
   private incineratorLabel!: Phaser.GameObjects.Text;
   private cityLabel!: Phaser.GameObjects.Text;
   private wireLabel!: Phaser.GameObjects.Text;
+  private wasteObjs: Phaser.GameObjects.GameObject[][] = [];
+  private solarObjs: Phaser.GameObjects.GameObject[] = [];
+  private solarLabel!: Phaser.GameObjects.Text;
   private wire!: Phaser.GameObjects.Graphics;
   private dragging = false;
   private pinching = false;
@@ -159,6 +183,28 @@ class MapScene extends Phaser.Scene {
     this.icon((c.x + 1.5) * T, (c.y + 1.5) * T, '🏙️', 1.8);
     this.cityLabel = this.label();
     this.wireLabel = this.label();
+
+    // Hromady toxického odpadu kolem spalovny (ukážou se po krizi podle toho, kolik ho leží na poli)
+    for (const spot of WASTE_SPOTS) {
+      const box = this.add.rectangle(spot.x * T, spot.y * T, T, T, 0x5b2a86, 0.85).setOrigin(0).setVisible(false);
+      const mark = this.add
+        .text((spot.x + 0.5) * T, (spot.y + 0.5) * T, '☣️', { fontFamily: 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif', fontSize: `${T * 0.8}px` })
+        .setOrigin(0.5)
+        .setResolution(Math.min(8, MAP_ZOOM_MAX * this.dpr))
+        .setVisible(false);
+      this.wasteObjs.push([box, mark]);
+    }
+
+    // Sluneční panely (ukážou se, když je máme)
+    const sol = SOLAR_TILE;
+    const panel = this.add.rectangle(sol.x * T, sol.y * T, T * 4, T * 2, 0x2b4f9e).setOrigin(0).setStrokeStyle(2, 0x000000, 0.5).setVisible(false);
+    const sun = this.add
+      .text((sol.x + 2) * T, (sol.y + 1) * T, '☀️', { fontFamily: 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif', fontSize: `${T * 1.2}px` })
+      .setOrigin(0.5)
+      .setResolution(Math.min(8, MAP_ZOOM_MAX * this.dpr))
+      .setVisible(false);
+    this.solarObjs = [panel, sun];
+    this.solarLabel = this.label().setVisible(false);
   }
 
   // Posun až po pohybu prstu (ne při prostém klepnutí). Přiblížení dvěma prsty čteme přímo
@@ -234,8 +280,9 @@ class MapScene extends Phaser.Scene {
     const color = !v.incineratorOn ? COLORS.incineratorOff : v.incineratorRunning ? COLORS.incinerator : COLORS.incineratorIdle;
     this.incinerator.setFillStyle(color, 1);
     const state = !v.incineratorOn ? '⏸ vypnutá' : v.incineratorRunning ? '🔥 vyrábí' : '⏳ čeká na VO';
+    const wasteLine = v.toxic ? `\n☣️ pole ${v.toxicField.toFixed(0)} · sklad ${v.toxicStored.toFixed(0)} / ${v.storageCap.toFixed(0)}` : '';
     this.incineratorLabel
-      .setText(`Spalovna\n${state} ${v.productionMW.toFixed(1)} / ${v.nominalMW} MW\n♻️ sklad ${v.vo.toFixed(0)} / ${v.voMax.toFixed(0)} VO`)
+      .setText(`Spalovna\n${state} ${(v.productionMW - v.solarMW).toFixed(1)} / ${v.nominalMW} MW\n♻️ sklad ${v.vo.toFixed(0)} / ${v.voMax.toFixed(0)} VO${wasteLine}`)
       .setScale(labelScale)
       .setPosition((a.x + 1) * T, a.y * T - 4);
 
@@ -245,6 +292,19 @@ class MapScene extends Phaser.Scene {
       .setText(`Město\n⚡ ${v.deliveredMW.toFixed(1)} / ${v.demandMW.toFixed(0)} MW\n💰 +${v.incomePerSecond.toFixed(1)}/s`)
       .setScale(labelScale)
       .setPosition((c.x + 1.5) * T, c.y * T - 4);
+
+    // Hromady odpadu: kolik jich je vidět, podle zaplněnosti pole
+    const shown = v.toxic && v.toxicField > 0.5 ? Math.max(1, Math.ceil(WASTE_SPOTS.length * Math.min(1, v.toxicField / v.toxicFieldFull))) : 0;
+    this.wasteObjs.forEach((objs, i) => objs.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Visible).setVisible(i < shown)));
+
+    // Sluneční panely
+    const hasSolar = v.solarLevel > 0;
+    this.solarObjs.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Visible).setVisible(hasSolar));
+    this.solarLabel
+      .setVisible(hasSolar && factor >= 0.75)
+      .setText(`Sluneční panely\n☀️ ${v.solarMW.toFixed(1)} / ${v.solarCapMW} MW`)
+      .setScale(labelScale)
+      .setPosition((SOLAR_TILE.x + 2) * T, SOLAR_TILE.y * T - 4);
 
     // Dráty: svítí podle toho, kolik energie teče, s popiskem propustnosti
     const flow = v.demandMW > 0 ? Math.min(1, v.deliveredMW / v.demandMW) : 0;
