@@ -30,7 +30,9 @@ function loadSaved() {
     return null; // úložiště nemusí být dostupné (např. anonymní okno)
   }
 }
+let resetting = false; // při mazání postupu se nesmí uložit zpátky (ukládá se i při zavření stránky)
 function saveNow(): void {
+  if (resetting) return;
   try {
     localStorage.setItem(SAVE_KEY, serialize(state));
   } catch {
@@ -142,6 +144,7 @@ const resetBtn = document.createElement('button');
 resetBtn.textContent = 'Smazat postup';
 resetBtn.addEventListener('click', () => {
   if (confirm('Opravdu smazat celý postup a začít od nuly?')) {
+    resetting = true;
     try {
       localStorage.removeItem(SAVE_KEY);
     } catch {
