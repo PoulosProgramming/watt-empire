@@ -236,7 +236,7 @@ describe('rozsah spotřeby města', () => {
     const r = cityDemandRangeMW(s);
     expect(r.min).toBeCloseTo(7, 5);
     expect(r.max).toBeCloseTo(14, 1);
-    s.delivered = 400; // prestiž 2
+    s.delivered = 500; // prestiž 2
     expect(cityDemandRangeMW(s).min).toBeCloseTo(7 * 1.25, 5);
   });
 });

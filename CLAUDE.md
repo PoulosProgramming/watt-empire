@@ -29,7 +29,7 @@ Idle tycoon o elektrické síti, webová hra (mobil na výšku + PC). Design je 
 ## Stav plánu (GDD sekce 8)
 - [x] 1. Příprava
 - [x] 2. Jádro v číslech (HTML tlačítka, bez mapy; debug panel ×10 a +kredity)
-  - Po prvním hraní na mobilu (2 kola): sklad spalovny s hysterezí, pevný start 3 MW a výkon nákupem, mařič, větší baterie, auto regulátor až na konci kapitoly, nápověda, 12 úkolů, krize po 250 MWh.
+  - Po prvním hraní na mobilu (2 kola): sklad spalovny s hysterezí, pevný start 3 MW a výkon nákupem, mařič, větší baterie, auto regulátor až na konci kapitoly, nápověda, 12 úkolů, krize po 350 MWh.
 - [ ] 3. Mapa a stavění … 7. Kapitola 3
 
 ## Poznatky z hraní (první testy na mobilu, 8. 11. 2026)
@@ -38,9 +38,9 @@ Zapisuj sem, co ukázalo hraní, ať další agent ví, proč je hra nastavená 
 - **Přebytek v noci řeší hráč nákupem:** mařič (odvede 2 MW za úroveň, stojí 4 kredity za MWh) a baterie (10 MWh/úroveň). Automatický regulátor je záměrně velmi drahý (12000) a patří na konec kapitoly 1, protože řeší vše naráz.
 - **Město limitovalo hráče** a dráty byly zbytečné. Základní spotřeba zvýšena na 14 MW (ve dne 8–14, v noci 7 MW). Vedení má teď základ 6 MW (+3 za úroveň).
 - **Brigádníci byli moc levní a rychlí;** účinnost spalovny nikdo nekupoval. Proto dražší brigádníci (základ 500, růst 1,45×, max 10: první si hráč koupí po ~5 min klikání), nižší těžba na brigádníka (0,3 VO/s) a odpad je úzké hrdlo při vyšším výkonu, takže účinnost má smysl.
-- **Kapitola 1 se dala dohrát za ~10 min.** Hranice jsme zvedli: krize po 250 MWh, konec kapitoly (prestiž 2) po 400 MWh, 12 úkolů. Bot s rozumnou strategií ji dohraje za ~23 min (člověk pomaleji).
+- **Kapitola 1 se dala dohrát za ~10 min.** Hranice jsme zvedli: krize po 350 MWh (hráč řekl, že původních 250 přišlo dřív, než si stihl postavit autonomii), konec kapitoly (prestiž 2) po 500 MWh. Bot s rozumnou strategií ji dohraje za ~24 min (člověk pomaleji). Brigádníci: základ 400, růst 1,4× (po dalším testu mírně zlevněni, byli už otravní).
 - **Houpání výroby 0↔6 MW** bylo jen na startu (málo VO). Řeší sklad s hysterezí: spalovna se rozjede při 15 VO a zhasne, když sklad nestačí.
-- **Ekologická krize chyběla.** Zatím jen v číslech: po 250 MWh se objeví upozornění a město platí 60 %. Vizuální toxický odpad (2×2 na mapě) přijde s mapou (krok 3/4), řešení v kapitole 2.
+- **Ekologická krize chyběla.** Zatím jen v číslech: po 350 MWh se objeví upozornění a město platí 60 %. Vizuální toxický odpad (2×2 na mapě) přijde s mapou (krok 3/4), řešení v kapitole 2.
 - **Tlačítko „Třídit odpad"** bylo moc velké a hráč ho po chvíli nepoužíval (na mapě se tříbí klepáním na odpad, krok 3). Zmenšeno.
 - **Ladění:** ×10 rychlost je hodně používaná, protože pasivní fáze je nudná. Tlačítko +1000 kreditů ničí zkoušení tempa, ve finální verzi ho schovat.
 - **Baterie** dlouho nic nepřinášela (přebytek se prostě ztrácel). Zvětšena na 10 MWh/úroveň. Vyplatí se až při výkonu nad ~8 MW, kam hráč v kapitole 1 dojde pozdě. Zkontrolovat v dalším testu.
