@@ -14,9 +14,13 @@ export interface MapView {
   incineratorOn: boolean;
   incineratorRunning: boolean;
   productionMW: number;
+  nominalMW: number; // nejvyšší výkon spalovny
   deliveredMW: number;
-  demandMW: number;
-  hour: number;
+  demandMW: number; // smluvní odběr města
+  lineMW: number; // propustnost vedení
+  vo: number;
+  voMax: number;
+  incomePerSecond: number;
   isNight: boolean;
 }
 
@@ -40,13 +44,15 @@ const COLORS = {
 
 class MapScene extends Phaser.Scene {
   private getView!: () => MapView;
-  private incinerator!: Phaser.GameObjects.Rectangle;
-  private incineratorText!: Phaser.GameObjects.Text;
-  private cityText!: Phaser.GameObjects.Text;
-  private wire!: Phaser.GameObjects.Graphics;
   private nightEl!: HTMLElement;
   private dpr = 1;
+  private incinerator!: Phaser.GameObjects.Rectangle;
+  private incineratorLabel!: Phaser.GameObjects.Text;
+  private cityLabel!: Phaser.GameObjects.Text;
+  private wireLabel!: Phaser.GameObjects.Text;
+  private wire!: Phaser.GameObjects.Graphics;
   private dragging = false;
+  private pinching = false;
   private pinchLast = 0;
   private minZoom = 0.5;
 
@@ -62,15 +68,16 @@ class MapScene extends Phaser.Scene {
 
   create(): void {
     this.drawGround();
-    this.drawWire();
+    this.wire = this.add.graphics();
     this.drawBuildings();
 
     const cam = this.cameras.main;
-    cam.setBounds(0, 0, WORLD, WORLD);
+    const pad = WORLD * 0.5; // kolem ostrova je jen voda, ať jde oddálit a vidět celý ostrov
+    cam.setBounds(-pad, -pad, WORLD + 2 * pad, WORLD + 2 * pad);
     this.applyMinZoom();
     cam.setZoom(Math.max(this.minZoom, MAP_ZOOM_START * this.dpr));
-    const center = MAP_INCINERATOR_TILE;
-    cam.centerOn((center.x + 1) * T, (center.y + 1) * T);
+    const a = MAP_INCINERATOR_TILE;
+    cam.centerOn((a.x + 1) * T, (a.y + 1) * T);
 
     this.scale.on('resize', () => {
       this.applyMinZoom();
@@ -78,13 +85,14 @@ class MapScene extends Phaser.Scene {
     });
 
     this.setupInput();
+
+    // Ladicí háček pro testy v prohlížeči (jen čtení zoomu)
+    (window as unknown as { __wattMap?: { zoom: () => number } }).__wattMap = { zoom: () => cam.zoom };
   }
 
-  // Nejmenší zoom = celá mapa se právě vejde, dál oddálit nejde
+  // Nejmenší zoom = celý ostrov se právě vejde (i s trochou vody kolem), dál oddálit nejde
   private applyMinZoom(): void {
-    const w = this.scale.width;
-    const h = this.scale.height;
-    this.minZoom = Math.max(w / WORLD, h / WORLD, 0.1);
+    this.minZoom = Math.max(Math.min(this.scale.width, this.scale.height) / (WORLD * 1.1), 0.1);
   }
 
   private drawGround(): void {
@@ -112,8 +120,29 @@ class MapScene extends Phaser.Scene {
     return tiles;
   }
 
-  private drawWire(): void {
-    this.wire = this.add.graphics();
+  // Ostré emoji i při velkém přiblížení: textura s vysokým rozlišením
+  private icon(x: number, y: number, emoji: string, sizeTiles: number): void {
+    this.add
+      .text(x, y, emoji, { fontFamily: 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif', fontSize: `${T * sizeTiles}px` })
+      .setOrigin(0.5)
+      .setResolution(Math.min(8, MAP_ZOOM_MAX * this.dpr));
+  }
+
+  // Popisek má stále stejnou velikost na obrazovce (nezávisle na přiblížení)
+  private label(): Phaser.GameObjects.Text {
+    return this.add
+      .text(0, 0, '', {
+        fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        fontSize: '15px',
+        color: '#ffffff',
+        backgroundColor: '#0b1220dd',
+        padding: { x: 6, y: 4 },
+        align: 'center',
+        lineSpacing: 2,
+      })
+      .setOrigin(0.5, 1)
+      .setResolution(this.dpr * 2)
+      .setDepth(10);
   }
 
   private drawBuildings(): void {
@@ -122,42 +151,59 @@ class MapScene extends Phaser.Scene {
       .rectangle(a.x * T, a.y * T, T * 2, T * 2, COLORS.incinerator)
       .setOrigin(0)
       .setStrokeStyle(2, 0x000000, 0.5);
-    this.add.text((a.x + 1) * T, (a.y + 1) * T, '🏭', { fontSize: `${T * 1.4}px` }).setOrigin(0.5);
-    this.incineratorText = this.add
-      .text((a.x + 1) * T, a.y * T - 6, '', { fontSize: '14px', color: '#ffffff', backgroundColor: '#000000aa', padding: { x: 4, y: 2 } })
-      .setOrigin(0.5, 1);
+    this.icon((a.x + 1) * T, (a.y + 1) * T, '🏭', 1.4);
+    this.incineratorLabel = this.label();
 
     const c = MAP_CITY_TILE;
     this.add.rectangle(c.x * T, c.y * T, T * 3, T * 3, COLORS.city).setOrigin(0).setStrokeStyle(2, 0x000000, 0.5);
-    this.add.text((c.x + 1.5) * T, (c.y + 1.5) * T, '🏙️', { fontSize: `${T * 1.8}px` }).setOrigin(0.5);
-    this.cityText = this.add
-      .text((c.x + 1.5) * T, c.y * T - 6, '', { fontSize: '14px', color: '#ffffff', backgroundColor: '#000000aa', padding: { x: 4, y: 2 } })
-      .setOrigin(0.5, 1);
+    this.icon((c.x + 1.5) * T, (c.y + 1.5) * T, '🏙️', 1.8);
+    this.cityLabel = this.label();
+    this.wireLabel = this.label();
   }
 
-  // Posun až po pohybu prstu (ne při prostém klepnutí), přiblížení dvěma prsty nebo kolečkem
+  // Posun až po pohybu prstu (ne při prostém klepnutí). Přiblížení dvěma prsty čteme přímo
+  // z dotykových událostí prohlížeče (spolehlivější než přiřazení prstů ve hře), kolečko na PC.
   private setupInput(): void {
-    this.input.addPointer(1);
     const cam = this.cameras.main;
+    const el = this.game.canvas;
+    const maxZoom = MAP_ZOOM_MAX * this.dpr;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+    el.addEventListener(
+      'touchstart',
+      (e) => {
+        if (e.touches.length >= 2) {
+          this.pinching = true;
+          this.pinchLast = dist(e.touches);
+        }
+      },
+      { passive: false },
+    );
+    el.addEventListener(
+      'touchmove',
+      (e) => {
+        if (e.touches.length < 2) return;
+        e.preventDefault();
+        const d = dist(e.touches);
+        // roztahování prstů (d roste) = přiblížení, sevření = oddálení
+        if (this.pinchLast > 0 && d > 0) cam.setZoom(Phaser.Math.Clamp(cam.zoom * (d / this.pinchLast), this.minZoom, maxZoom));
+        this.pinchLast = d;
+        this.pinching = true;
+      },
+      { passive: false },
+    );
+    const end = (e: TouchEvent) => {
+      if (e.touches.length < 2) this.pinchLast = 0;
+      if (e.touches.length === 0) this.pinching = false; // posun až po zvednutí všech prstů, ať mapa neskočí
+    };
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
 
     this.input.on('pointerdown', () => {
       this.dragging = false;
     });
-
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      const p1 = this.input.pointer1;
-      const p2 = this.input.pointer2;
-      if (p1.isDown && p2.isDown) {
-        const d = Phaser.Math.Distance.Between(p1.x, p1.y, p2.x, p2.y);
-        if (this.pinchLast > 0) {
-          cam.setZoom(Phaser.Math.Clamp(cam.zoom * (d / this.pinchLast), this.minZoom, MAP_ZOOM_MAX * this.dpr));
-        }
-        this.pinchLast = d;
-        this.dragging = true;
-        return;
-      }
-      this.pinchLast = 0;
-      if (!p.isDown) return;
+      if (this.pinching || !p.isDown) return;
       if (!this.dragging) {
         const moved = Phaser.Math.Distance.Between(p.x, p.y, p.downX, p.downY);
         if (moved < MAP_DRAG_THRESHOLD_PX * this.dpr) return;
@@ -166,38 +212,52 @@ class MapScene extends Phaser.Scene {
       cam.scrollX -= (p.x - p.prevPosition.x) / cam.zoom;
       cam.scrollY -= (p.y - p.prevPosition.y) / cam.zoom;
     });
-
-    this.input.on('pointerup', () => {
-      this.pinchLast = 0;
-    });
-
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => {
       const factor = dy > 0 ? 0.9 : 1.1;
-      cam.setZoom(Phaser.Math.Clamp(cam.zoom * factor, this.minZoom, MAP_ZOOM_MAX * this.dpr));
+      cam.setZoom(Phaser.Math.Clamp(cam.zoom * factor, this.minZoom, maxZoom));
     });
   }
 
   update(): void {
     const v = this.getView();
+    const cam = this.cameras.main;
+    // Popisky mají stálou velikost na obrazovce, při velkém oddálení se zmenší (ať se nepřekrývají)
+    const factor = Phaser.Math.Clamp(cam.zoom / this.dpr, 0.5, 1);
+    const labelScale = (this.dpr / cam.zoom) * factor;
+    this.wireLabel.setVisible(factor >= 0.75);
 
     // Noc: tmavý závoj (HTML vrstva nad mapou, jen vizuálně)
     this.nightEl.style.opacity = v.isNight ? '1' : '0';
 
-    // Spalovna: barva podle stavu
+    // Spalovna: barva podle stavu + popisek s čísly
+    const a = MAP_INCINERATOR_TILE;
     const color = !v.incineratorOn ? COLORS.incineratorOff : v.incineratorRunning ? COLORS.incinerator : COLORS.incineratorIdle;
     this.incinerator.setFillStyle(color, 1);
-    this.incineratorText.setText(
-      !v.incineratorOn ? '⏸ vypnuta' : v.incineratorRunning ? `🔥 ${v.productionMW.toFixed(1)} MW` : '⏳ čeká na VO',
-    );
-    this.cityText.setText(`${v.deliveredMW.toFixed(1)} / ${v.demandMW.toFixed(0)} MW`);
+    const state = !v.incineratorOn ? '⏸ vypnutá' : v.incineratorRunning ? '🔥 vyrábí' : '⏳ čeká na VO';
+    this.incineratorLabel
+      .setText(`Spalovna\n${state} ${v.productionMW.toFixed(1)} / ${v.nominalMW} MW\n♻️ sklad ${v.vo.toFixed(0)} / ${v.voMax.toFixed(0)} VO`)
+      .setScale(labelScale)
+      .setPosition((a.x + 1) * T, a.y * T - 4);
 
-    // Dráty: svítí podle toho, kolik energie teče
+    // Město: popisek s dodávkou
+    const c = MAP_CITY_TILE;
+    this.cityLabel
+      .setText(`Město\n⚡ ${v.deliveredMW.toFixed(1)} / ${v.demandMW.toFixed(0)} MW\n💰 +${v.incomePerSecond.toFixed(1)}/s`)
+      .setScale(labelScale)
+      .setPosition((c.x + 1.5) * T, c.y * T - 4);
+
+    // Dráty: svítí podle toho, kolik energie teče, s popiskem propustnosti
     const flow = v.demandMW > 0 ? Math.min(1, v.deliveredMW / v.demandMW) : 0;
     this.wire.clear();
     for (const t of this.wireTiles()) {
       this.wire.fillStyle(flow > 0.01 ? COLORS.wire : COLORS.wireDim, 0.35 + 0.65 * flow);
       this.wire.fillRect(t.x * T + T * 0.35, t.y * T + T * 0.35, T * 0.3, T * 0.3);
     }
+    const midX = (a.x + 2 + c.x + 1) / 2;
+    this.wireLabel
+      .setText(`🔌 vedení ${v.deliveredMW.toFixed(1)} / ${v.lineMW} MW`)
+      .setScale(labelScale)
+      .setPosition(midX * T, (a.y + 1) * T - 6);
   }
 }
 

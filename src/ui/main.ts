@@ -10,7 +10,6 @@ import {
   SECONDS_PER_GAME_HOUR,
   INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
-  MAP_HEIGHT_PERCENT,
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
   ONGOING_QUESTS_VISIBLE,
@@ -72,54 +71,69 @@ const fmt = (n: number, d = 1) => n.toFixed(d);
 
 const app = document.getElementById('app')!;
 app.innerHTML = `
-  <div class="sticky"><div class="stats">
-    <button class="stat" data-stat="credits"><b id="credits"></b><small id="income"></small></button>
-    <button class="stat" data-stat="energy"><b id="energy"></b><small id="power"></small></button>
-    <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
-  </div>
-  <div id="statdetail"></div></div>
-  <div id="alerts"></div>
   <div id="map"></div>
-  <div id="panel">
-  <div class="card story">📖 ${STORY_INTRO}</div>
-  <div id="ending"></div>
-  <details class="card help" open>
-    <summary>❓ Jak na to</summary>
-    <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
-    <p>Začni klepáním na odpad, pak najmi brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
-    <p>Máš <b>smlouvu na stálých 15 MW</b>, den i noc. Za kredity zvyšuj <b>výkon</b> spalovny a vedení (dráty a trafo), ať městu dodáš celých 15 MW. Pozor: vedení musí unést tvůj výkon, jinak se síť přetíží a přijde ⚫ blackout.</p>
-  </details>
+  <div id="hud">
+    <div class="stats">
+      <button class="stat" data-stat="credits"><b id="credits"></b><small id="income"></small></button>
+      <button class="stat" data-stat="energy"><b id="energy"></b><small id="power"></small></button>
+      <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
+    </div>
+    <div id="statdetail"></div>
+    <div id="alerts"></div>
+  </div>
   <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
 
-  <h2>Spalovna</h2>
-  <div class="card">
-    <div class="row"><span>Stav</span><b id="incstate"></b></div>
-    <div class="row"><span>Sklad VO</span><b id="incstock"></b></div>
-    <div class="row"><span>Cena VO navíc (nad sklad)</span><b>${VO_OVERFLOW_PRICE} 💰 / VO</b></div>
-    <div class="row"><span>Výkon</span><b id="inclevel"></b></div>
-    <button id="toggle" style="width:100%;margin-top:6px"></button>
-  </div>
+  <nav id="tabs">
+    <button class="tab" data-tab="furnace" aria-label="Spalovna">🏭</button>
+    <button class="tab" data-tab="upgrades" aria-label="Vylepšení">🛠️</button>
+    <button class="tab" data-tab="quests" aria-label="Úkoly">📋</button>
+    <button class="tab" data-tab="net" aria-label="Síť">🔌</button>
+    <button class="tab" data-tab="info" aria-label="Příběh a nápověda">📖</button>
+    <button class="tab" data-tab="debug" aria-label="Ladění">⚙️</button>
+  </nav>
 
-  <div id="incupgrades"></div>
-
-  <h2>Vylepšení</h2>
-  <div id="upgrades"></div>
-
-  <h2>Úkoly</h2>
-  <div class="card" id="quests"></div>
-
-  <h2>Průběžné úkoly</h2>
-  <div class="card" id="ongoing"></div>
-
-  <details class="card netdetail">
-    <summary>🔌 Síť (podrobnosti)</summary>
-    <div id="grid"></div>
-  </details>
-
-  <h2>Ladění</h2>
-  <div class="card debug" id="debug"></div>
-  </div>
+  <section id="sheet" hidden>
+    <header><b id="sheettitle"></b><button id="sheetclose" aria-label="Zavřít">✕</button></header>
+    <div class="sheetbody">
+      <div data-sheet="furnace" hidden>
+        <div class="card">
+          <div class="row"><span>Stav</span><b id="incstate"></b></div>
+          <div class="row"><span>Sklad VO</span><b id="incstock"></b></div>
+          <div class="row"><span>Cena VO navíc (nad sklad)</span><b>${VO_OVERFLOW_PRICE} 💰 / VO</b></div>
+          <div class="row"><span>Výkon</span><b id="inclevel"></b></div>
+          <button id="toggle" style="width:100%;margin-top:6px"></button>
+        </div>
+        <div id="incupgrades"></div>
+      </div>
+      <div data-sheet="upgrades" hidden>
+        <div id="upgrades"></div>
+      </div>
+      <div data-sheet="quests" hidden>
+        <h2>Úkoly</h2>
+        <div class="card" id="quests"></div>
+        <h2>Průběžné úkoly</h2>
+        <div class="card" id="ongoing"></div>
+      </div>
+      <div data-sheet="net" hidden>
+        <div class="card"><div id="grid"></div></div>
+      </div>
+      <div data-sheet="info" hidden>
+        <div class="card story">📖 ${STORY_INTRO}</div>
+        <div id="ending"></div>
+        <div class="card help">
+          <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
+          <p>Začni klepáním na odpad, pak najmi brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
+          <p>Máš <b>smlouvu na stálých 15 MW</b>, den i noc. Za kredity zvyšuj <b>výkon</b> spalovny a vedení (dráty a trafo), ať městu dodáš celých 15 MW. Pozor: vedení musí unést tvůj výkon, jinak se síť přetíží a přijde ⚫ blackout.</p>
+          <p>Mapu posuneš tažením prstu a přiblížíš dvěma prsty. Záložky vpravo otevírají menu: 🏭 spalovna, 🛠️ vylepšení, 📋 úkoly, 🔌 síť, 📖 nápověda, ⚙️ ladění.</p>
+        </div>
+      </div>
+      <div data-sheet="debug" hidden>
+        <div class="card debug" id="debug"></div>
+      </div>
+    </div>
+  </section>
 `;
+
 
 let openStat = '';
 document.querySelectorAll<HTMLElement>('.stat').forEach((el) =>
@@ -144,12 +158,21 @@ function showToast(html: string): void {
 }
 // Velký popup při spuštění ekologické krize (po načtení hry s už probíhající krizí se neukazuje)
 let seenToxic = state.toxic;
-function showModal(title: string, text: string): void {
+function showModal(title: string, text: string, good = false): void {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
-  overlay.innerHTML = `<div class="modal"><h3>${title}</h3><p>${text}</p><button class="modal-ok">Rozumím</button></div>`;
+  overlay.innerHTML = `<div class="modal${good ? ' good' : ''}"><h3>${title}</h3><p>${text}</p><button class="modal-ok">Rozumím</button></div>`;
   overlay.querySelector('button')!.addEventListener('click', () => overlay.remove());
   document.body.appendChild(overlay);
+}
+// Velký popup na konci kapitoly 1 (jednou; po načtení hry s už dokončenou kapitolou se neukazuje)
+const chapter1Done = () => CHAPTER1_END_QUESTS.every((id) => state.doneQuests.includes(id));
+let seenEnd = chapter1Done();
+function announceEnd(): void {
+  if (!seenEnd && chapter1Done()) {
+    seenEnd = true;
+    showModal('🏁 Konec kapitoly 1', STORY_CHAPTER_END, true);
+  }
 }
 function announceCrisis(): void {
   if (state.toxic && !seenToxic) {
@@ -187,6 +210,28 @@ function runOffline(): void {
 runOffline(); // po načtení hry dopočítat čas, kdy hráč nehrál
 
 const $ = (id: string) => document.getElementById(id)!;
+
+// Záložky na boku: klepnutí otevře menu přes mapu, další klepnutí (nebo ✕) ho zavře
+const TAB_TITLES: Record<string, string> = {
+  furnace: '🏭 Spalovna',
+  upgrades: '🛠️ Vylepšení',
+  quests: '📋 Úkoly',
+  net: '🔌 Síť',
+  info: '📖 Příběh a nápověda',
+  debug: '⚙️ Ladění',
+};
+let openTab = '';
+function showTab(name: string): void {
+  openTab = name;
+  $('sheet').hidden = !name;
+  $('sheettitle').textContent = TAB_TITLES[name] ?? '';
+  document.querySelectorAll<HTMLElement>('[data-sheet]').forEach((el) => (el.hidden = el.dataset.sheet !== name));
+  document.querySelectorAll<HTMLElement>('.tab').forEach((el) => el.classList.toggle('active', el.dataset.tab === name));
+}
+document.querySelectorAll<HTMLElement>('.tab').forEach((el) =>
+  el.addEventListener('click', () => showTab(openTab === el.dataset.tab ? '' : el.dataset.tab!)),
+);
+$('sheetclose').addEventListener('click', () => showTab(''));
 
 $('tap').addEventListener('click', () => tap(state));
 $('toggle').addEventListener('click', () => {
@@ -372,14 +417,17 @@ function render(): void {
 }
 
 // Mapa (Phaser): jen čte stav hry, nic v simulaci nemění
-$('map').style.flex = `0 0 ${MAP_HEIGHT_PERCENT}%`;
 createMap($('map'), () => ({
   incineratorOn: state.incineratorOn,
   incineratorRunning: state.incineratorRunning,
   productionMW: state.live.productionMW,
+  nominalMW: incineratorNominalMW(state),
   deliveredMW: state.live.deliveredMW,
   demandMW: state.live.demandMW,
-  hour: state.hour,
+  lineMW: lineCapacityMW(state),
+  vo: state.vo,
+  voMax: voStorageMax(state),
+  incomePerSecond: state.live.incomePerSecond + state.live.overflowIncomePerSecond - state.live.wagePerSecond - state.live.dumpCostPerSecond,
   isNight: !isDay(state.hour),
 }));
 
@@ -395,6 +443,7 @@ function frame(now: number): void {
   }
   announceQuests();
   announceCrisis();
+  announceEnd();
   render();
   requestAnimationFrame(frame);
 }

@@ -89,7 +89,7 @@ Město není samostatná obrazovka ani druhá hra. Zůstává na stejné mapě v
 UI je navržené pro mobil na výšku (720×1280) a na PC se škáluje do okna; myš nahrazuje dotyk.
 
 - **Horní lišta:** kredity (stav + příjem), energie (dodáno MWh + aktuální výkon v MW), VO (stav + těžba za sekundu).
-- **Levý výsuvný panel:** nákup budov a parcel, vylepšení, výzkum (přepnutí do merge minihry), úkoly a statistiky.
+- **Menu (od 9. 11. 2026 záložky na boku):** mapa je přes celou plochu a menu (spalovna, vylepšení, úkoly, síť, nápověda, ladění) jsou záložky s emoji na boku, které otevřou panel přes mapu. Dřívější popis: **Levý výsuvný panel:** nákup budov a parcel, vylepšení, výzkum (přepnutí do merge minihry), úkoly a statistiky.
 - **Herní plocha:** klik na budovu otevře okno se statistikami (vyrobeno, uloženo, účinnost, ztráty) a upgrady.
 - **Město:** pevný bod v pravém dolním rohu, rostoucí podle sekce 5.
 - **Náhodné nabídky:** časově omezené, např. dodej 100 VO za dvojnásobek peněz.
