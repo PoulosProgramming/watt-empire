@@ -1,17 +1,19 @@
 import './style.css';
 import {
+  AUTOSAVE_SECONDS,
   DEBUG_CREDITS_BONUS,
   DEBUG_SPEEDS,
   INCINERATOR_START_VO,
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
   QUESTS,
+  QUESTS_VISIBLE,
   STORY_CHAPTER_END,
   STORY_INTRO,
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
-import { buyUpgrade, tap, upgradeCost } from '../sim/economy';
+import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../sim/economy';
 import { TICK_DT, tick } from '../sim/game';
 import { batteryCapacityMWh, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
@@ -34,7 +36,7 @@ function saveNow(): void {
   }
 }
 const state = loadSaved() ?? newGame();
-setInterval(saveNow, 5000);
+setInterval(saveNow, AUTOSAVE_SECONDS * 1000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') saveNow();
 });
@@ -210,6 +212,11 @@ function render(): void {
 
   for (const { def, el } of upgradeButtons) {
     const lvl = s.upgrades[def.id];
+    if (!isUnlocked(s, def.id)) {
+      el.disabled = true;
+      el.innerHTML = `<span>🔒 ${def.name}<small>Odemkne se ${def.unlock!.text}</small></span>`;
+      continue;
+    }
     const max = lvl >= def.maxLevel;
     const cost = upgradeCost(def.id, lvl);
     el.disabled = max || s.credits < cost;
@@ -221,11 +228,17 @@ function render(): void {
     ? `<div class="card ending"><b>🏁 Konec kapitoly 1</b><p>${STORY_CHAPTER_END}</p></div>`
     : '';
 
-  $('quests').innerHTML = QUESTS.map((q) => {
-    const done = s.doneQuests.includes(q.id);
-    const p = Math.min(q.target, questProgress(s, q));
-    return `<div class="row quest ${done ? 'done' : ''}"><span>${q.text}</span><span>${done ? '✔' : `${fmt(p, 0)}/${q.target} (+${q.reward}💰)`}</span></div>`;
-  }).join('');
+  const open = QUESTS.filter((q) => !s.doneQuests.includes(q.id));
+  const shown = open.slice(0, QUESTS_VISIBLE);
+  $('quests').innerHTML =
+    `<div class="row"><span>Splněno</span><b>${s.doneQuests.length} / ${QUESTS.length}</b></div>` +
+    shown
+      .map((q) => {
+        const p = Math.min(q.target, questProgress(s, q));
+        return `<div class="row quest"><span>${q.text}</span><span>${fmt(p, 0)}/${q.target} (+${q.reward}💰)</span></div>`;
+      })
+      .join('') +
+    (open.length > shown.length ? `<small>…a ${open.length - shown.length} dalších úkolů se odemkne postupně.</small>` : '');
 }
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce

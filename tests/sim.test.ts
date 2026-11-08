@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CREDITS_PER_MWH, INCINERATOR_START_VO, QUESTS, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
-import { buyUpgrade, tap, upgradeCost } from '../src/sim/economy';
+import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../src/sim/economy';
 import { TICK_DT, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
 import { newGame } from '../src/sim/state';
@@ -26,6 +26,7 @@ describe('ekonomika', () => {
   it('nákup vylepšení stojí správně', () => {
     const s = newGame();
     s.credits = 1000;
+    s.taps = 200; // odemkne brigádníky
     expect(buyUpgrade(s, 'worker')).toBe(true);
     expect(s.credits).toBe(1000 - upgradeCost('worker', 0));
     expect(s.upgrades.worker).toBe(1);
@@ -198,5 +199,29 @@ describe('ukládání', () => {
     expect(s.upgrades.worker).toBe(1);
     expect(s.upgrades.regulator).toBe(0);
     expect(s.live.dumpedMW).toBe(0);
+  });
+});
+
+describe('odemykání', () => {
+  it('brigádníci jsou zamčení do 200 tapů a nejdou koupit', () => {
+    const s = newGame();
+    s.credits = 5000;
+    s.taps = 199;
+    expect(isUnlocked(s, 'worker')).toBe(false);
+    expect(buyUpgrade(s, 'worker')).toBe(false);
+    expect(s.credits).toBe(5000);
+    s.taps = 200;
+    expect(isUnlocked(s, 'worker')).toBe(true);
+    expect(buyUpgrade(s, 'worker')).toBe(true);
+  });
+
+  it('mařič se odemkne až po výkonu spalovny 2, regulátor po 250 MWh', () => {
+    const s = newGame();
+    expect(isUnlocked(s, 'dump')).toBe(false);
+    s.upgrades.power = 2;
+    expect(isUnlocked(s, 'dump')).toBe(true);
+    expect(isUnlocked(s, 'regulator')).toBe(false);
+    s.delivered = 250;
+    expect(isUnlocked(s, 'regulator')).toBe(true);
   });
 });
