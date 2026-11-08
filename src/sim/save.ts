@@ -1,0 +1,29 @@
+import { newGame, type GameState } from './state';
+
+// Ukládání jako text (JSON). Čistý TypeScript: o samotné úložiště (localStorage) se stará UI.
+export const SAVE_VERSION = 1;
+
+export function serialize(s: GameState): string {
+  return JSON.stringify({ v: SAVE_VERSION, state: s });
+}
+
+// Vrátí načtenou hru, nebo null, když je text poškozený. Chybějící pole se doplní výchozími
+// hodnotami, takže starší uložení nerozbije novou verzi hry.
+export function deserialize(text: string | null): GameState | null {
+  if (!text) return null;
+  try {
+    const data = JSON.parse(text);
+    if (!data || typeof data !== 'object' || data.v !== SAVE_VERSION || typeof data.state !== 'object') return null;
+    const base = newGame();
+    const saved = data.state as Partial<GameState>;
+    return {
+      ...base,
+      ...saved,
+      upgrades: { ...base.upgrades, ...(saved.upgrades ?? {}) },
+      live: { ...base.live, ...(saved.live ?? {}) },
+      doneQuests: Array.isArray(saved.doneQuests) ? saved.doneQuests : [],
+    };
+  } catch {
+    return null;
+  }
+}

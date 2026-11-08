@@ -15,9 +15,30 @@ import { buyUpgrade, tap, upgradeCost } from '../sim/economy';
 import { TICK_DT, tick } from '../sim/game';
 import { batteryCapacityMWh, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
+import { deserialize, serialize } from '../sim/save';
 import { newGame } from '../sim/state';
 
-const state = newGame();
+const SAVE_KEY = 'watt-empire-save';
+function loadSaved() {
+  try {
+    return deserialize(localStorage.getItem(SAVE_KEY));
+  } catch {
+    return null; // úložiště nemusí být dostupné (např. anonymní okno)
+  }
+}
+function saveNow(): void {
+  try {
+    localStorage.setItem(SAVE_KEY, serialize(state));
+  } catch {
+    /* nejde uložit, hra běží dál */
+  }
+}
+const state = loadSaved() ?? newGame();
+setInterval(saveNow, 5000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveNow();
+});
+window.addEventListener('pagehide', saveNow);
 let speed = 1;
 const fmt = (n: number, d = 1) => n.toFixed(d);
 
@@ -90,6 +111,19 @@ DEBUG_SPEEDS.forEach((sp) => {
   b.addEventListener('click', () => (speed = sp));
   $('speeds').appendChild(b);
 });
+const resetBtn = document.createElement('button');
+resetBtn.textContent = 'Smazat postup';
+resetBtn.addEventListener('click', () => {
+  if (confirm('Opravdu smazat celý postup a začít od nuly?')) {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {
+      /* nic */
+    }
+    location.reload();
+  }
+});
+$('debug').appendChild(resetBtn);
 $('bonus').addEventListener('click', () => (state.credits += DEBUG_CREDITS_BONUS));
 
 function render(): void {
@@ -100,8 +134,8 @@ function render(): void {
     const n = l.incomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
     $('income').textContent = `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n))}/s`;
   }
-  $('energy').textContent = `⚡ ${fmt(s.delivered)} MWh`;
-  $('power').textContent = `${fmt(l.deliveredMW)} MW`;
+  $('energy').textContent = `⚡ ${fmt(l.productionMW)} MW`;
+  $('power').textContent = `chce ${fmt(l.demandMW)} MW`;
   $('vo').textContent = `♻️ ${fmt(s.vo, 0)} VO`;
   $('vops').textContent = `+${fmt(l.voPerSecond)}/s`;
 
@@ -117,13 +151,19 @@ function render(): void {
       line('Celkem', signed(net), 'total') +
       (s.toxic ? `<small>☣️ Krize: město platí jen ${Math.round(TOXIC_INCOME_FACTOR * 100)} %.</small>` : '');
   } else if (openStat === 'energy') {
+    const toBattery = Math.max(0, l.batteryFlowMW);
+    const fromBattery = Math.max(0, -l.batteryFlowMW);
     detail =
-      line('Dodáno celkem', `${fmt(s.delivered)} MWh`) +
-      line('Výroba spalovny', `${fmt(l.productionMW)} MW`) +
-      line('Dodáváme městu', `${fmt(l.deliveredMW)} MW`) +
-      line('Baterie', `${l.batteryFlowMW >= 0 ? '+' : '−'}${fmt(Math.abs(l.batteryFlowMW))} MW (${fmt(s.battery)} MWh)`) +
-      line('Spálí mařič', `${fmt(l.dumpedMW)} MW`) +
-      line('Ztraceno (přetížení)', `${fmt(l.wastedMW)} MW`, l.wastedMW > 0.01 ? 'minus' : '');
+      line('Výroba spalovny', `${fmt(l.productionMW)} MW`, 'plus') +
+      line('Z baterie', `+${fmt(fromBattery)} MW`, fromBattery > 0.01 ? 'plus' : '') +
+      line('Do baterie', `−${fmt(toBattery)} MW`, toBattery > 0.01 ? 'minus' : '') +
+      line('Spálí mařič', `−${fmt(l.dumpedMW)} MW`, l.dumpedMW > 0.01 ? 'minus' : '') +
+      line('Ztraceno (přetížení)', `−${fmt(l.wastedMW)} MW`, l.wastedMW > 0.01 ? 'minus' : '') +
+      line('Dodáváme městu', `${fmt(l.deliveredMW)} MW`, 'total') +
+      line('Město chce', `${fmt(l.demandMW)} MW`) +
+      line('Vedení unese', `${lineCapacityMW(s)} MW`) +
+      line('Baterie', `${fmt(s.battery)} / ${batteryCapacityMWh(s)} MWh`) +
+      `<small>Dodáno celkem: ${fmt(s.delivered)} MWh</small>`;
   } else if (openStat === 'vo') {
     const voNet = l.voPerSecond - l.voBurnedPerSecond;
     detail =

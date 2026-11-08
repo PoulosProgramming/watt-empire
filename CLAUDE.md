@@ -5,7 +5,7 @@ Idle tycoon o elektrické síti, webová hra (mobil na výšku + PC). Design je 
 ## Stack
 - TypeScript + Vite (build, dev server), Vitest (testy).
 - Phaser 3 až od kroku 3 plánu (mapa). UI jsou HTML/CSS prvky nad herní plochou.
-- Uložení: localStorage + export/import textu (krok 5). Žádný server.
+- Uložení: localStorage (automaticky každých 5 s a při zavření stránky, `src/sim/save.ts` + UI) je hotové; export/import textu a offline progres zbývají na krok 5. Žádný server. Při změně `GameState` zvaž zvýšení `SAVE_VERSION` (chybějící pole se doplní výchozími hodnotami).
 
 ## Architektura (nejdůležitější pravidla)
 1. **Simulace je oddělená od grafiky.** Složka `src/sim/` je čistý TypeScript – žádný Phaser, žádné `document`/`window`. Grafika a UI (`src/ui/`) jen čtou stav.
@@ -45,4 +45,6 @@ Zapisuj sem, co ukázalo hraní, ať další agent ví, proč je hra nastavená 
 - **Ladění:** ×10 rychlost je hodně používaná, protože pasivní fáze je nudná. Tlačítko +1000 kreditů ničí zkoušení tempa, ve finální verzi ho schovat.
 - **Baterie** dlouho nic nepřinášela (přebytek se prostě ztrácel). Zvětšena na 10 MWh/úroveň. Vyplatí se až při výkonu nad ~8 MW, kam hráč v kapitole 1 dojde pozdě. Zkontrolovat v dalším testu.
 - **Klikání vs. mapa:** teď hráč 100× klikne na tlačítko. Na mapě (krok 3) musí odpad najít a sebrat, což bude pomalejší. Až bude mapa, přeladit ceny brigádníků a sběr, aby 5 min ručního sběru zůstalo stejně dlouhých.
+- **Ztráta postupu po obnovení stránky** hráče naštvala, proto se ukládá už teď (předčasně před krokem 5). V ladění je tlačítko „Smazat postup".
+- **Karta ⚡** ukazuje bilanci výkonu (výroba, baterie, mařič, ztráty, dodávka vs. co město chce), ne celkově dodané MWh (to je jen malá poznámka v rozpisu).
 - **Nevyřešeno:** čím se bude zvedat spotřeba města (budovy klikem, růst jen při online hraní, viz GDD sekce 9).
