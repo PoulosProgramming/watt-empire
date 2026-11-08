@@ -6,6 +6,8 @@ import {
   TOXIC_INCOME_FACTOR,
   OVERLOAD_TOLERANCE_SECONDS,
   QUESTS,
+  STORY_CHAPTER_END,
+  STORY_INTRO,
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
@@ -27,6 +29,8 @@ app.innerHTML = `
     <div class="stat"><b id="vo"></b><small id="vops"></small></div>
   </div>
   <div id="alerts"></div>
+  <div class="card story">📖 ${STORY_INTRO}</div>
+  <div id="ending"></div>
   <details class="card help" open>
     <summary>❓ Jak na to</summary>
     <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
@@ -130,6 +134,11 @@ function render(): void {
     el.disabled = max || s.credits < cost;
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${def.description}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
+
+  const chapterDone = QUESTS.every((q) => s.doneQuests.includes(q.id));
+  $('ending').innerHTML = chapterDone
+    ? `<div class="card ending"><b>🏁 Konec kapitoly 1</b><p>${STORY_CHAPTER_END}</p></div>`
+    : '';
 
   $('quests').innerHTML = QUESTS.map((q) => {
     const done = s.doneQuests.includes(q.id);

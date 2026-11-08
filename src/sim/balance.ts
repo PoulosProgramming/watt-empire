@@ -100,6 +100,12 @@ export const QUESTS: QuestDef[] = [
   { id: 'deliver400', text: 'Dodej městu 400 MWh (konec kapitoly 1)', kind: 'delivered', target: 400, reward: 2000 },
 ];
 
+// ---- Příběh (zatím jen text, postavy a dialogy přijdou v kroku 4) ----
+export const STORY_INTRO =
+  'Zamořený ostrov. Jediná věc, která tu ještě funguje, je stará spalovna odpadu. Městečko za kopcem je bez proudu a starosta tě prosí: roztoč spalovnu, vyčisti pláž a dodej městu elektřinu, než zhasne naposledy.';
+export const STORY_CHAPTER_END =
+  'Město svítí a ostrov dýchá, ale spalovna vyplivla toxický odpad a pod hladinou se probouzí něco většího. Konec kapitoly 1. V kapitole 2 přijde laboratoř, likvidátor odpadu a první soláry. Zatím jde hra dál ladit: dohraj poslední úkoly a pošli, co ti vadilo.';
+
 // ---- Ladění ----
 export const DEBUG_SPEEDS = [1, 10];
 export const DEBUG_CREDITS_BONUS = 1000;
