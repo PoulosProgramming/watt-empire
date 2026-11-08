@@ -1,7 +1,18 @@
 import './style.css';
-import { DEBUG_CREDITS_BONUS, DEBUG_SPEEDS, QUESTS, UPGRADES } from '../sim/balance';
+import {
+  DEBUG_CREDITS_BONUS,
+  DEBUG_SPEEDS,
+  INCINERATOR_LEVEL_CHANGE_FEE,
+  INCINERATOR_LEVEL_STEP,
+  INCINERATOR_MIN_LOAD,
+  INCINERATOR_NOMINAL_MW,
+  INCINERATOR_START_VO,
+  OVERLOAD_TOLERANCE_SECONDS,
+  QUESTS,
+  UPGRADES,
+} from '../sim/balance';
 import { isDay } from '../sim/daynight';
-import { buyUpgrade, tap, upgradeCost } from '../sim/economy';
+import { buyUpgrade, setIncineratorLevel, tap, upgradeCost } from '../sim/economy';
 import { TICK_DT, tick } from '../sim/game';
 import { batteryCapacityMWh, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
@@ -19,13 +30,27 @@ app.innerHTML = `
     <div class="stat"><b id="vo"></b><small id="vops"></small></div>
   </div>
   <div id="alerts"></div>
+  <details class="card help" open>
+    <summary>❓ Jak na to</summary>
+    <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
+    <p>Město spotřebuje <b>ve dne víc a v noci míň</b>. Když vyrábíš víc, než město vezme a vedení unese, síť se přetěžuje a po pár sekundách přijde ⚫ blackout.</p>
+    <p>Řešení: <b>sniž výkon spalovny</b> posuvníkem (stojí malý poplatek), kup 🔋 baterii na přebytky, nebo 🤖 automatický regulátor, který to dělá za tebe.</p>
+    <p>Brigádníci dodávají VO a berou mzdu. Spalovna se rozjede, až má ve skladu dost VO.</p>
+  </details>
   <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
 
   <h2>Síť</h2>
   <div class="card" id="grid"></div>
 
   <h2>Spalovna</h2>
-  <div class="card"><button id="toggle" style="width:100%"></button></div>
+  <div class="card">
+    <div class="row"><span>Stav</span><b id="incstate"></b></div>
+    <div class="row"><span>Sklad VO</span><b id="incstock"></b></div>
+    <div class="row"><span>Výkon</span><b id="inclevel"></b></div>
+    <input type="range" id="level" min="${Math.round(INCINERATOR_MIN_LOAD * 100)}" max="100" step="${Math.round(INCINERATOR_LEVEL_STEP * 100)}" style="width:100%;height:44px">
+    <small id="levelhint"></small>
+    <button id="toggle" style="width:100%;margin-top:6px"></button>
+  </div>
 
   <h2>Vylepšení</h2>
   <div id="upgrades"></div>
@@ -40,6 +65,11 @@ app.innerHTML = `
 const $ = (id: string) => document.getElementById(id)!;
 
 $('tap').addEventListener('click', () => tap(state));
+const slider = $('level') as HTMLInputElement;
+slider.addEventListener('change', () => {
+  setIncineratorLevel(state, Number(slider.value) / 100);
+  slider.blur();
+});
 $('toggle').addEventListener('click', () => {
   state.incineratorOn = !state.incineratorOn;
 });
@@ -75,7 +105,7 @@ function render(): void {
   const mm = Math.floor((s.hour % 1) * 60).toString().padStart(2, '0');
   const dayNight = isDay(s.hour) ? '<span class="day">☀️ den</span>' : '<span class="night">🌙 noc</span>';
   const bcap = batteryCapacityMWh(s);
-  const overPct = Math.min(100, (s.overload / 4) * 100);
+  const overPct = Math.min(100, (s.overload / OVERLOAD_TOLERANCE_SECONDS) * 100);
   $('grid').innerHTML = `
     <div class="row"><span>Čas</span><b>Den ${s.day}, ${hh}:${mm} ${dayNight}</b></div>
     <div class="row"><span>Prestiž města</span><b>${prestige(s)}</b></div>
@@ -88,11 +118,24 @@ function render(): void {
 
   let alerts = '';
   if (s.blackout > 0) alerts += `<div class="alert">⚫ BLACKOUT! Síť naběhne za ${Math.ceil(s.blackout)} s</div>`;
-  else if (s.overload > 0.5) alerts += `<div class="alert warn">⚠️ Síť se přetěžuje! Kup baterii nebo vypni spalovnu.</div>`;
+  else if (s.overload > 0.5) alerts += `<div class="alert warn">⚠️ Síť se přetěžuje! Sniž výkon spalovny nebo kup baterii.</div>`;
   if (l.workersPaused) alerts += `<div class="alert warn">💸 Brigádníci stojí: nejsou peníze na mzdy.</div>`;
   $('alerts').innerHTML = alerts;
 
-  $('toggle').textContent = s.incineratorOn ? '🔥 Spalovna běží (klepni = vypnout)' : '⏸ Spalovna vypnutá (klepni = zapnout)';
+  const regulated = s.upgrades.regulator > 0;
+  $('incstate').textContent = !s.incineratorOn
+    ? '⏸ vypnutá'
+    : s.incineratorRunning
+      ? '🔥 vyrábí'
+      : `⏳ čeká na VO (rozjede se při ${INCINERATOR_START_VO})`;
+  $('incstock').textContent = `${fmt(s.vo, 0)} VO`;
+  $('inclevel').textContent = `${fmt(s.incineratorLevel * INCINERATOR_NOMINAL_MW)} MW (${Math.round(s.incineratorLevel * 100)} %)${regulated ? ' 🤖 auto' : ''}`;
+  slider.disabled = regulated;
+  if (document.activeElement !== slider) slider.value = String(Math.round(s.incineratorLevel * 100));
+  $('levelhint').textContent = regulated
+    ? 'Výkon řídí automatický regulátor.'
+    : `Změna výkonu stojí 💰 ${INCINERATOR_LEVEL_CHANGE_FEE}.`;
+  $('toggle').textContent = s.incineratorOn ? '🔥 Spalovna zapnutá (klepni = vypnout)' : '⏸ Spalovna vypnutá (klepni = zapnout)';
 
   for (const { def, el } of upgradeButtons) {
     const lvl = s.upgrades[def.id];

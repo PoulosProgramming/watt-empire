@@ -1,8 +1,10 @@
-import { QUESTS } from './balance';
+import { QUESTS, type QuestDef } from './balance';
 import type { GameState } from './state';
 
-export function questProgress(s: GameState, q: (typeof QUESTS)[number]): number {
-  return q.kind === 'taps' ? s.taps : s.delivered;
+export function questProgress(s: GameState, q: QuestDef): number {
+  if (q.kind === 'taps') return s.taps;
+  if (q.kind === 'upgrade') return q.upgrade ? s.upgrades[q.upgrade] : 0;
+  return s.delivered;
 }
 
 // Splněné úkoly vyplatí odměnu (jednou).

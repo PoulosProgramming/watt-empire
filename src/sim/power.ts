@@ -7,6 +7,7 @@ import {
   DEMAND_PER_PRESTIGE,
   INCINERATOR_MIN_LOAD,
   INCINERATOR_NOMINAL_MW,
+  INCINERATOR_START_VO,
   INCINERATOR_VO_PER_MWH,
   LINE_BASE_CAPACITY_MW,
   LINE_UPGRADE_MW,
@@ -50,19 +51,29 @@ export function runPower(s: GameState, dt: number): void {
     return;
   }
 
-  // 1) Výroba ve spalovně (omezená zásobou VO)
+  // 1) Výroba ve spalovně. Sklad VO má hysterezi: rozjede se až při INCINERATOR_START_VO
+  //    a zhasne, když nestačí na další tik. Díky tomu výkon neskáče nahoru a dolů.
+  if (s.upgrades.regulator > 0) {
+    // Automatický regulátor: výkon podle spotřeby města (a vedení), v mezích spalovny
+    const target = Math.min(live.demandMW, lineCapacityMW(s)) / INCINERATOR_NOMINAL_MW;
+    s.incineratorLevel = Math.min(1, Math.max(INCINERATOR_MIN_LOAD, target));
+  }
   let production = 0;
   if (s.incineratorOn) {
     const vpm = voPerMWh(s, INCINERATOR_VO_PER_MWH);
-    const wantedMWh = INCINERATOR_NOMINAL_MW * dtH;
-    const possibleMWh = Math.min(wantedMWh, s.vo / vpm);
-    s.vo -= possibleMWh * vpm;
-    production = possibleMWh / dtH;
-    // Spalovna nemůže běžet pod minimálním výkonem; slabší zásoba = zhasne
-    if (production < INCINERATOR_NOMINAL_MW * INCINERATOR_MIN_LOAD) {
-      s.vo += possibleMWh * vpm; // vrať palivo
-      production = 0;
+    const wantedMW = INCINERATOR_NOMINAL_MW * s.incineratorLevel;
+    const neededVO = wantedMW * dtH * vpm;
+    if (!s.incineratorRunning && s.vo >= INCINERATOR_START_VO) s.incineratorRunning = true;
+    if (s.incineratorRunning) {
+      if (s.vo < neededVO) {
+        s.incineratorRunning = false; // sklad je prázdný, čeká na dodávky
+      } else {
+        s.vo -= neededVO;
+        production = wantedMW;
+      }
     }
+  } else {
+    s.incineratorRunning = false;
   }
 
   // 2) Dodávka městu a baterie

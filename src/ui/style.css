@@ -11,7 +11,7 @@ h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: #
 button { min-height: 48px; min-width: 44px; border: 0; border-radius: 10px; font-size: 16px; font-weight: 600; background: #2563eb; color: #fff; padding: 8px 14px; }
 button:disabled { background: #334155; color: #64748b; }
 button:active:not(:disabled) { transform: scale(.97); }
-.tap { width: 100%; min-height: 96px; font-size: 22px; background: #16a34a; }
+.tap { width: 100%; min-height: 56px; font-size: 18px; background: #16a34a; }
 .up { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; margin-bottom: 6px; background: #334155; }
 .up:disabled { opacity: .6; }
 .up small { display: block; font-weight: 400; color: #cbd5e1; }
@@ -24,3 +24,7 @@ button:active:not(:disabled) { transform: scale(.97); }
 .quest.done { color: #4ade80; text-decoration: line-through; }
 .debug { opacity: .85; }
 .debug button { background: #475569; min-height: 44px; margin-right: 6px; }
+
+.help summary { font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.help p { font-size: 14px; margin: 6px 0; color: #cbd5e1; }
+small { color: #94a3b8; }

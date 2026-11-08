@@ -141,3 +141,10 @@ Nejdřív ověřit, že je jádro zábavné bez grafiky, a teprve pak stavět ma
 | Ztráta uložené hry | Prohlížeč (hlavně iOS) může data webu smazat | Instalace jako PWA na plochu, export a import save jako text |
 | Nekonzistentní grafika | Kenney + AI ikony nesedí dohromady | Jeden Kenney balík jako základ, AI ikony generovat ve stejné paletě a stylu |
 | Rozrůstání rozsahu | Nové nápady před dokončením kapitoly 1 | Nové nápady psát do sekce „Později“, kapitolu 1 dotáhnout jako první |
+
+## 9. Později (nápady mimo aktuální krok)
+
+Z prvního hraní na mobilu (kroky 4 a dál):
+- **Rostoucí spotřeba města:** budovy staví hráč kliknutím (krok 4). Navíc může spotřeba pomalu růst s úrovní, ale jen při aktivním hraní, ne offline.
+- **Toxická krize po ~90 MWh** a úkoly od postav (krok 4); brigádníci tam budou omezeni množstvím odpadu na ostrově.
+- **Tutoriál s postavami** místo textové nápovědy.
