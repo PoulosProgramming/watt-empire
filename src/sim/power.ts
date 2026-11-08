@@ -105,6 +105,13 @@ export function runPower(s: GameState, dt: number): void {
     s.incineratorRunning = false;
   }
 
+  // Autonomie: brigádníci dodávají aspoň tolik VO, kolik spalovna při současném výkonu potřebuje
+  const needVoPerSecond = s.incineratorOn
+    ? (incineratorNominalMW(s) * s.incineratorLevel / SECONDS_PER_GAME_HOUR) * voPerMWh(s, INCINERATOR_VO_PER_MWH)
+    : 0;
+  live.voNeedPerSecond = needVoPerSecond;
+  live.autonomous = s.incineratorOn && !live.workersPaused && live.voPerSecond >= needVoPerSecond - 1e-9;
+
   // 2) Dodávka městu a baterie
   const demand = live.demandMW;
   const line = lineCapacityMW(s);
@@ -128,7 +135,8 @@ export function runPower(s: GameState, dt: number): void {
   // 3) Dodaná energie = peníze
   const mwh = toCity * dtH;
   s.delivered += mwh;
-  if (s.delivered >= TOXIC_CRISIS_MWH) s.toxic = true;
+  // Krize začne až ve chvíli, kdy je hráč autonomní (nemusí klikat a má z čeho žít)
+  if (s.delivered >= TOXIC_CRISIS_MWH && live.autonomous) s.toxic = true;
   const creditsPerMWh = CREDITS_PER_MWH * (s.toxic ? TOXIC_INCOME_FACTOR : 1);
   s.credits += mwh * creditsPerMWh;
 

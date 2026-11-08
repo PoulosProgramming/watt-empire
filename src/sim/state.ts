@@ -30,6 +30,8 @@ export interface GameState {
     wagePerSecond: number; // mzdy brigádníků
     dumpCostPerSecond: number; // náklady na mařič
     voBurnedPerSecond: number; // VO spálené ve spalovně
+    voNeedPerSecond: number; // kolik VO za sekundu spalovna potřebuje při současném výkonu
+    autonomous: boolean; // brigádníci stačí zásobit spalovnu (hráč nemusí klikat)
     voPerSecond: number;
     workersPaused: boolean;
   };
@@ -64,6 +66,8 @@ export function newGame(): GameState {
       wagePerSecond: 0,
       dumpCostPerSecond: 0,
       voBurnedPerSecond: 0,
+      voNeedPerSecond: 0,
+      autonomous: false,
       voPerSecond: 0,
       workersPaused: false,
     },

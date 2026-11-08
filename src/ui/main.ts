@@ -201,6 +201,8 @@ function render(): void {
       line('Brigádníci', `+${fmt(l.voPerSecond, 2)}/s`, 'plus') +
       line('Ruční třídění', `${s.taps} tapů celkem`) +
       line('Spálí spalovna', `−${fmt(l.voBurnedPerSecond, 2)}/s`, 'minus') +
+      line('Spalovna potřebuje', `${fmt(l.voNeedPerSecond, 2)}/s`) +
+      line('Autonomie', l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : `✖ chybí ${fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2)} VO/s (najmi brigádníka, kup účinnost nebo klikej)`, l.autonomous ? 'plus' : 'minus') +
       line('Celkem (bez tapů)', signed(voNet), 'total') +
       line('Sklad', `${fmt(s.vo, 0)} VO`);
   }

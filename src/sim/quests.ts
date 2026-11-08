@@ -3,6 +3,7 @@ import type { GameState } from './state';
 
 export function requirementProgress(s: GameState, r: Requirement): number {
   if (r.kind === 'taps') return s.taps;
+  if (r.kind === 'autonomy') return s.live.autonomous ? 1 : 0;
   if (r.kind === 'upgrade') return r.upgrade ? s.upgrades[r.upgrade] : 0;
   return s.delivered;
 }
