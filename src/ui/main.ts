@@ -12,10 +12,11 @@ import {
   STORY_CHAPTER_END,
   STORY_INTRO,
   TOAST_SECONDS,
+  VO_OVERFLOW_PRICE,
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
-import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../sim/economy';
+import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voStorageMax } from '../sim/economy';
 import { TICK_DT, tick } from '../sim/game';
 import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
 import { questProgress } from '../sim/quests';
@@ -40,6 +41,7 @@ function saveNow(): void {
   }
 }
 const state = loadSaved() ?? newGame();
+clampVO(state); // starší uložení mohlo mít víc VO, než se vejde do skladu
 setInterval(saveNow, AUTOSAVE_SECONDS * 1000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') saveNow();
@@ -62,13 +64,10 @@ app.innerHTML = `
   <details class="card help" open>
     <summary>❓ Jak na to</summary>
     <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
-    <p>Začni klepáním na odpad, pak najmi brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
+    <p>Začni klepáním na odpad, pak najmi brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
     <p>Za kredity zvyšuj <b>výkon</b>. Pozor: <b>v noci město bere málo</b>. Přebytek pak odvede 🔥 mařič (stojí peníze) nebo ho uloží 🔋 baterie. Když se přebytek nevejde nikam, síť se přetíží a přijde ⚫ blackout.</p>
   </details>
   <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
-
-  <h2>Síť</h2>
-  <div class="card" id="grid"></div>
 
   <h2>Spalovna</h2>
   <div class="card">
@@ -78,11 +77,18 @@ app.innerHTML = `
     <button id="toggle" style="width:100%;margin-top:6px"></button>
   </div>
 
+  <div id="incupgrades"></div>
+
   <h2>Vylepšení</h2>
   <div id="upgrades"></div>
 
   <h2>Úkoly</h2>
   <div class="card" id="quests"></div>
+
+  <details class="card netdetail">
+    <summary>🔌 Síť (podrobnosti)</summary>
+    <div id="grid"></div>
+  </details>
 
   <h2>Ladění</h2>
   <div class="card debug" id="debug"></div>
@@ -129,7 +135,7 @@ const upgradeButtons = UPGRADES.map((u) => {
   const b = document.createElement('button');
   b.className = 'up';
   b.addEventListener('click', () => buyUpgrade(state, u.id));
-  $('upgrades').appendChild(b);
+  $(u.group === 'incinerator' ? 'incupgrades' : 'upgrades').appendChild(b);
   return { def: u, el: b };
 });
 
@@ -161,22 +167,24 @@ function render(): void {
   const l = s.live;
   $('credits').textContent = `💰 ${Math.floor(s.credits)}`;
   {
-    const n = l.incomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
+    const n = l.incomePerSecond + l.overflowIncomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
     $('income').textContent = `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n))}/s`;
   }
   $('energy').textContent = `⚡ ${fmt(l.productionMW)} MW`;
   $('power').textContent = `chce ${fmt(l.demandMW)} MW`;
   $('vo').textContent = `♻️ ${fmt(s.vo, 0)} VO`;
+  $('tap').textContent = s.vo >= voStorageMax(s) - 1e-9 ? `♻️ Sklad plný: VO se prodá za ${VO_OVERFLOW_PRICE} 💰` : '♻️ Třídit odpad (+1 VO)';
   $('vops').textContent = `+${fmt(l.voPerSecond)}/s`;
 
   const line = (name: string, value: string, cls = '') => `<div class="row ${cls}"><span>${name}</span><b>${value}</b></div>`;
   const signed = (n: number) => `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n), 2)}/s`;
-  const net = l.incomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
+  const net = l.incomePerSecond + l.overflowIncomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
   let detail = '';
   if (openStat === 'credits') {
     detail =
       line('Prodej energie městu (běžná cena)', `+${fmt(l.incomePerSecond + l.crisisLossPerSecond, 2)}/s`, 'plus') +
       (s.toxic ? line('☣️ Ekologická krize (město platí jen ' + Math.round(TOXIC_INCOME_FACTOR * 100) + ' %)', `−${fmt(l.crisisLossPerSecond, 2)}/s`, 'minus') : '') +
+      line('Prodej přebytečného VO (plný sklad)', `+${fmt(l.overflowIncomePerSecond, 2)}/s`, 'plus') +
       line('Mzdy brigádníků', `−${fmt(l.wagePerSecond, 2)}/s`, 'minus') +
       line('Mařič přebytku', `−${fmt(l.dumpCostPerSecond, 2)}/s`, 'minus') +
       line('Celkem', signed(net), 'total') +
@@ -239,7 +247,7 @@ function render(): void {
     : s.incineratorRunning
       ? '🔥 vyrábí'
       : `⏳ čeká na VO (rozjede se při ${INCINERATOR_START_VO})`;
-  $('incstock').textContent = `${fmt(s.vo, 0)} VO`;
+  $('incstock').textContent = `${fmt(s.vo, 0)} / ${fmt(voStorageMax(s), 0)} VO`;
   $('inclevel').textContent = `${fmt(incineratorNominalMW(s) * s.incineratorLevel)} / ${incineratorNominalMW(s)} MW${regulated ? ' 🤖 auto' : ''}`;
   $('toggle').textContent = s.incineratorOn ? '🔥 Spalovna zapnutá (klepni = vypnout)' : '⏸ Spalovna vypnutá (klepni = zapnout)';
 

@@ -7,8 +7,6 @@ import {
   DEMAND_PER_PRESTIGE,
   DUMP_COST_PER_MWH,
   DUMP_MW_PER_LEVEL,
-  INCINERATOR_BASE_MW,
-  INCINERATOR_POWER_STEP_MW,
   INCINERATOR_MIN_LOAD,
   INCINERATOR_START_VO,
   INCINERATOR_VO_PER_MWH,
@@ -21,7 +19,7 @@ import {
   TOXIC_INCOME_FACTOR,
 } from './balance';
 import { baseDemandMW } from './daynight';
-import { voPerMWh } from './economy';
+import { incineratorNominalMW, voPerMWh } from './economy';
 import type { GameState } from './state';
 
 export function prestige(s: GameState): number {
@@ -33,8 +31,7 @@ export function prestige(s: GameState): number {
 }
 
 export const lineCapacityMW = (s: GameState) => LINE_BASE_CAPACITY_MW + s.upgrades.line * LINE_UPGRADE_MW;
-export const incineratorNominalMW = (s: GameState) =>
-  INCINERATOR_BASE_MW + s.upgrades.power * INCINERATOR_POWER_STEP_MW;
+export { incineratorNominalMW };
 export const dumpCapacityMW = (s: GameState) => s.upgrades.dump * DUMP_MW_PER_LEVEL;
 export const batteryCapacityMWh = (s: GameState) => s.upgrades.battery * BATTERY_CAPACITY_PER_LEVEL_MWH;
 export const batteryRateMW = (s: GameState) => s.upgrades.battery * BATTERY_RATE_PER_LEVEL_MW;

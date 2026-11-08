@@ -12,6 +12,9 @@ export const START_HOUR = 8;
 // ---- Ruční sběr a brigádníci ----
 export const VO_PER_TAP = 1; // 5 tapů na odpad = 5 VO (GDD)
 export const WORKER_VO_PER_SECOND = 0.4; // 5 brigádníků = 2 VO/s = přesně na 6 MW
+// Sklad VO u spalovny má strop = tolik sekund provozu při plném výkonu. Přebytek se automaticky prodá.
+export const VO_STORAGE_SECONDS = 60;
+export const VO_OVERFLOW_PRICE = 0.3; // kredity za 1 prodaný VO navíc
 export const WORKER_WAGE_PER_SECOND = 0.2; // mzda v kreditech za sekundu
 
 // ---- Spalovna ----
@@ -71,16 +74,17 @@ export interface UpgradeDef {
   growth: number; // cena × growth s každou úrovní
   maxLevel: number;
   unlock?: Requirement & { text: string }; // bez podmínky je vylepšení dostupné hned
+  group?: 'incinerator'; // vylepšení spalovny se v UI zobrazí přímo pod kartou Spalovna
 }
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 175, growth: 1.3, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 2, text: 'po 2 upgradech výkonu spalovny' } },
-  { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz, ale v noci hrozí přebytek)', baseCost: 300, growth: 1.8, maxLevel: 7, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' } },
-  { id: 'efficiency', name: 'Účinnost spalovny', description: 'Z méně VO více energie', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' } },
+  { id: 'worker', name: 'Brigádník', description: 'Sbírá odpad za tebe, bere mzdu', baseCost: 175, growth: 1.3, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 1, text: 'po prvním upgradu výkonu spalovny' } },
+  { id: 'power', name: 'Výkon spalovny', description: '+1 MW (víc peněz, ale v noci hrozí přebytek)', baseCost: 300, growth: 1.8, maxLevel: 7, unlock: { kind: 'delivered', target: 10, text: 'po dodání 10 MWh' }, group: 'incinerator' },
+  { id: 'efficiency', name: 'Účinnost spalovny', description: 'Z méně VO více energie', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' }, group: 'incinerator' },
   { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
   { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'upgrade', upgrade: 'power', target: 4, text: 'po výkonu spalovny 7 MW (od 8 MW vzniká noční přebytek)' } },
   { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 4, text: 'po výkonu spalovny 7 MW (od 8 MW vzniká noční přebytek)' } },
-  { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1, unlock: { kind: 'delivered', target: 250, text: 'po dodání 250 MWh' } },
+  { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1, unlock: { kind: 'delivered', target: 250, text: 'po dodání 250 MWh' }, group: 'incinerator' },
 ];
 
 // ---- Úkoly (zatím bez postav) ----
@@ -96,8 +100,9 @@ export const QUESTS_VISIBLE = 3;
 export const QUESTS: QuestDef[] = [
   { id: 'deliver1', text: 'Dodej městu 1 MWh', kind: 'delivered', target: 1, reward: 20 },
   { id: 'tap25', text: 'Vyčisti 25 odpadků (ruční tapy)', kind: 'taps', target: 25, reward: 30 },
-  { id: 'power2', text: 'Zvyš výkon spalovny na úroveň 2 (5 MW)', kind: 'upgrade', upgrade: 'power', target: 2, reward: 300 },
+  { id: 'power1', text: 'Zvyš výkon spalovny na úroveň 1 (4 MW, odemkne brigádníky)', kind: 'upgrade', upgrade: 'power', target: 1, reward: 150 },
   { id: 'worker3', text: 'Najmi 3 brigádníky', kind: 'upgrade', upgrade: 'worker', target: 3, reward: 80 },
+  { id: 'power2', text: 'Zvyš výkon spalovny na úroveň 2 (5 MW)', kind: 'upgrade', upgrade: 'power', target: 2, reward: 300 },
   { id: 'deliver30', text: 'Dodej městu 30 MWh', kind: 'delivered', target: 30, reward: 150 },
   { id: 'power3', text: 'Zvyš výkon spalovny na úroveň 3 (6 MW, tolik unese vedení)', kind: 'upgrade', upgrade: 'power', target: 3, reward: 250 },
   { id: 'line1', text: 'Posil dráty a trafo (kvůli výkonu nad 6 MW)', kind: 'upgrade', upgrade: 'line', target: 1, reward: 300 },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CREDITS_PER_MWH, INCINERATOR_START_VO, QUESTS, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
-import { buyUpgrade, isUnlocked, tap, upgradeCost } from '../src/sim/economy';
+import { CREDITS_PER_MWH, INCINERATOR_START_VO, QUESTS, VO_OVERFLOW_PRICE, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
+import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, tick } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
@@ -27,7 +27,7 @@ describe('ekonomika', () => {
   it('nákup vylepšení stojí správně', () => {
     const s = newGame();
     s.credits = 1000;
-    s.upgrades.power = 2; // odemkne brigádníky
+    s.upgrades.power = 1; // odemkne brigádníky
     expect(buyUpgrade(s, 'worker')).toBe(true);
     expect(s.credits).toBe(1000 - upgradeCost('worker', 0));
     expect(s.upgrades.worker).toBe(1);
@@ -232,14 +232,14 @@ describe('ukládání', () => {
 });
 
 describe('odemykání', () => {
-  it('brigádníci jsou zamčení do 2 upgradů výkonu a nejdou koupit', () => {
+  it('brigádníci jsou zamčení do prvního upgradu výkonu a nejdou koupit', () => {
     const s = newGame();
     s.credits = 5000;
-    s.upgrades.power = 1;
+    s.upgrades.power = 0;
     expect(isUnlocked(s, 'worker')).toBe(false);
     expect(buyUpgrade(s, 'worker')).toBe(false);
     expect(s.credits).toBe(5000);
-    s.upgrades.power = 2;
+    s.upgrades.power = 1;
     expect(isUnlocked(s, 'worker')).toBe(true);
     expect(buyUpgrade(s, 'worker')).toBe(true);
   });
@@ -282,5 +282,33 @@ describe('krize v rozpisu příjmů', () => {
     const full = s.live.incomePerSecond + s.live.crisisLossPerSecond;
     expect(s.live.crisisLossPerSecond).toBeGreaterThan(0);
     expect(s.live.incomePerSecond / full).toBeCloseTo(0.6, 5);
+  });
+});
+
+describe('sklad VO', () => {
+  it('sklad má strop a přebytek se prodá', () => {
+    const s = newGame();
+    const max = voStorageMax(s);
+    expect(max).toBeCloseTo(60, 5); // 3 MW = 1 VO/s, 60 s
+    s.vo = max - 1;
+    addVO(s, 3);
+    expect(s.vo).toBeCloseTo(max, 5);
+    expect(s.credits).toBeCloseTo(2 * VO_OVERFLOW_PRICE, 5);
+  });
+
+  it('strop roste s výkonem spalovny', () => {
+    const s = newGame();
+    const low = voStorageMax(s);
+    s.upgrades.power = 3;
+    expect(voStorageMax(s)).toBeGreaterThan(low);
+  });
+
+  it('tap do plného skladu přidá kredity místo VO', () => {
+    const s = newGame();
+    s.vo = voStorageMax(s);
+    tap(s);
+    expect(s.vo).toBeCloseTo(voStorageMax(s), 5);
+    expect(s.credits).toBeCloseTo(VO_OVERFLOW_PRICE, 5);
+    expect(s.taps).toBe(1);
   });
 });
