@@ -45,16 +45,19 @@ export function runWorkers(s: GameState, dt: number): void {
   if (workers === 0) {
     s.live.workersPaused = false;
     s.live.voPerSecond = 0;
+    s.live.wagePerSecond = 0;
     return;
   }
   const wage = workers * WORKER_WAGE_PER_SECOND * dt;
   if (s.credits < wage) {
     s.live.workersPaused = true;
     s.live.voPerSecond = 0;
+    s.live.wagePerSecond = 0;
     return;
   }
   s.live.workersPaused = false;
   s.credits -= wage;
   s.vo += workers * WORKER_VO_PER_SECOND * dt;
   s.live.voPerSecond = workers * WORKER_VO_PER_SECOND;
+  s.live.wagePerSecond = workers * WORKER_WAGE_PER_SECOND;
 }

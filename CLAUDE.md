@@ -18,7 +18,7 @@ Idle tycoon o elektrické síti, webová hra (mobil na výšku + PC). Design je 
 ## Pracovní postup
 - Malé zadání = jeden úkol. Nepřepisuj fungující věci, které s úkolem nesouvisí.
 - Po každé změně spusť `npm test` a `npm run build`; commit po každém dokončeném kroku.
-- UI: tlačítka min. 44 px, testuj mobil na výšku. Posun mapy až po pohybu prstu (od kroku 3).
+- UI: horní tři karty (💰 ⚡ ♻️) jsou klikací a rozbalují rozpis příjmů, výdajů a toků (hodnoty „live" ze simulace). UI: tlačítka min. 44 px, testuj mobil na výšku. Posun mapy až po pohybu prstu (od kroku 3).
 - Nové nápady mimo aktuální krok patří do sekce „Později“ v GDD, ne do kódu. Kapitolu 1 dotáhnout jako první.
 - Tento soubor udržuj aktuální.
 

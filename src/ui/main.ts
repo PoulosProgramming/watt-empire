@@ -23,11 +23,12 @@ const fmt = (n: number, d = 1) => n.toFixed(d);
 
 const app = document.getElementById('app')!;
 app.innerHTML = `
-  <div class="stats">
-    <div class="stat"><b id="credits"></b><small id="income"></small></div>
-    <div class="stat"><b id="energy"></b><small id="power"></small></div>
-    <div class="stat"><b id="vo"></b><small id="vops"></small></div>
+  <div class="sticky"><div class="stats">
+    <button class="stat" data-stat="credits"><b id="credits"></b><small id="income"></small></button>
+    <button class="stat" data-stat="energy"><b id="energy"></b><small id="power"></small></button>
+    <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
   </div>
+  <div id="statdetail"></div></div>
   <div id="alerts"></div>
   <div class="card story">📖 ${STORY_INTRO}</div>
   <div id="ending"></div>
@@ -60,6 +61,13 @@ app.innerHTML = `
   <div class="card debug" id="debug"></div>
 `;
 
+let openStat = '';
+document.querySelectorAll<HTMLElement>('.stat').forEach((el) =>
+  el.addEventListener('click', () => {
+    openStat = openStat === el.dataset.stat ? '' : el.dataset.stat!;
+  }),
+);
+
 const $ = (id: string) => document.getElementById(id)!;
 
 $('tap').addEventListener('click', () => tap(state));
@@ -88,11 +96,44 @@ function render(): void {
   const s = state;
   const l = s.live;
   $('credits').textContent = `💰 ${Math.floor(s.credits)}`;
-  $('income').textContent = `+${fmt(l.incomePerSecond)}/s`;
+  {
+    const n = l.incomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
+    $('income').textContent = `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n))}/s`;
+  }
   $('energy').textContent = `⚡ ${fmt(s.delivered)} MWh`;
   $('power').textContent = `${fmt(l.deliveredMW)} MW`;
   $('vo').textContent = `♻️ ${fmt(s.vo, 0)} VO`;
   $('vops').textContent = `+${fmt(l.voPerSecond)}/s`;
+
+  const line = (name: string, value: string, cls = '') => `<div class="row ${cls}"><span>${name}</span><b>${value}</b></div>`;
+  const signed = (n: number) => `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n), 2)}/s`;
+  const net = l.incomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
+  let detail = '';
+  if (openStat === 'credits') {
+    detail =
+      line('Prodej energie městu', `+${fmt(l.incomePerSecond, 2)}/s`, 'plus') +
+      line('Mzdy brigádníků', `−${fmt(l.wagePerSecond, 2)}/s`, 'minus') +
+      line('Mařič přebytku', `−${fmt(l.dumpCostPerSecond, 2)}/s`, 'minus') +
+      line('Celkem', signed(net), 'total') +
+      (s.toxic ? `<small>☣️ Krize: město platí jen ${Math.round(TOXIC_INCOME_FACTOR * 100)} %.</small>` : '');
+  } else if (openStat === 'energy') {
+    detail =
+      line('Dodáno celkem', `${fmt(s.delivered)} MWh`) +
+      line('Výroba spalovny', `${fmt(l.productionMW)} MW`) +
+      line('Dodáváme městu', `${fmt(l.deliveredMW)} MW`) +
+      line('Baterie', `${l.batteryFlowMW >= 0 ? '+' : '−'}${fmt(Math.abs(l.batteryFlowMW))} MW (${fmt(s.battery)} MWh)`) +
+      line('Spálí mařič', `${fmt(l.dumpedMW)} MW`) +
+      line('Ztraceno (přetížení)', `${fmt(l.wastedMW)} MW`, l.wastedMW > 0.01 ? 'minus' : '');
+  } else if (openStat === 'vo') {
+    const voNet = l.voPerSecond - l.voBurnedPerSecond;
+    detail =
+      line('Brigádníci', `+${fmt(l.voPerSecond, 2)}/s`, 'plus') +
+      line('Ruční třídění', `${s.taps} tapů celkem`) +
+      line('Spálí spalovna', `−${fmt(l.voBurnedPerSecond, 2)}/s`, 'minus') +
+      line('Celkem (bez tapů)', signed(voNet), 'total') +
+      line('Sklad', `${fmt(s.vo, 0)} VO`);
+  }
+  $('statdetail').innerHTML = detail ? `<div class="card detail">${detail}</div>` : '';
 
   const hh = Math.floor(s.hour).toString().padStart(2, '0');
   const mm = Math.floor((s.hour % 1) * 60).toString().padStart(2, '0');

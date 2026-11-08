@@ -25,7 +25,10 @@ export interface GameState {
     batteryFlowMW: number; // + nabíjí, - vybíjí
     wastedMW: number;
     dumpedMW: number; // přebytek spálený mařičem
-    incomePerSecond: number;
+    incomePerSecond: number; // příjem z prodeje energie
+    wagePerSecond: number; // mzdy brigádníků
+    dumpCostPerSecond: number; // náklady na mařič
+    voBurnedPerSecond: number; // VO spálené ve spalovně
     voPerSecond: number;
     workersPaused: boolean;
   };
@@ -56,6 +59,9 @@ export function newGame(): GameState {
       wastedMW: 0,
       dumpedMW: 0,
       incomePerSecond: 0,
+      wagePerSecond: 0,
+      dumpCostPerSecond: 0,
+      voBurnedPerSecond: 0,
       voPerSecond: 0,
       workersPaused: false,
     },
