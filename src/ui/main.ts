@@ -78,6 +78,8 @@ app.innerHTML = `
     <button id="toggle" style="width:100%;margin-top:6px"></button>
   </div>
 
+  <div id="incupgrades"></div>
+
   <h2>Vylepšení</h2>
   <div id="upgrades"></div>
 
@@ -129,7 +131,7 @@ const upgradeButtons = UPGRADES.map((u) => {
   const b = document.createElement('button');
   b.className = 'up';
   b.addEventListener('click', () => buyUpgrade(state, u.id));
-  $('upgrades').appendChild(b);
+  $(u.group === 'incinerator' ? 'incupgrades' : 'upgrades').appendChild(b);
   return { def: u, el: b };
 });
 
