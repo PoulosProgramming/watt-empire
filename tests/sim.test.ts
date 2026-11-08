@@ -27,7 +27,7 @@ describe('ekonomika', () => {
   it('nákup vylepšení stojí správně', () => {
     const s = newGame();
     s.credits = 1000;
-    s.upgrades.power = 2; // odemkne brigádníky
+    s.upgrades.power = 1; // odemkne brigádníky
     expect(buyUpgrade(s, 'worker')).toBe(true);
     expect(s.credits).toBe(1000 - upgradeCost('worker', 0));
     expect(s.upgrades.worker).toBe(1);
@@ -232,14 +232,14 @@ describe('ukládání', () => {
 });
 
 describe('odemykání', () => {
-  it('brigádníci jsou zamčení do 2 upgradů výkonu a nejdou koupit', () => {
+  it('brigádníci jsou zamčení do prvního upgradu výkonu a nejdou koupit', () => {
     const s = newGame();
     s.credits = 5000;
-    s.upgrades.power = 1;
+    s.upgrades.power = 0;
     expect(isUnlocked(s, 'worker')).toBe(false);
     expect(buyUpgrade(s, 'worker')).toBe(false);
     expect(s.credits).toBe(5000);
-    s.upgrades.power = 2;
+    s.upgrades.power = 1;
     expect(isUnlocked(s, 'worker')).toBe(true);
     expect(buyUpgrade(s, 'worker')).toBe(true);
   });
