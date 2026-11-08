@@ -173,7 +173,6 @@ function render(): void {
   $('energy').textContent = `⚡ ${fmt(l.productionMW)} MW`;
   $('power').textContent = `chce ${fmt(l.demandMW)} MW`;
   $('vo').textContent = `♻️ ${fmt(s.vo, 0)} VO`;
-  $('tap').textContent = s.vo >= voStorageMax(s) - 1e-9 ? `♻️ Sklad plný: VO se prodá za ${VO_OVERFLOW_PRICE} 💰` : '♻️ Třídit odpad (+1 VO)';
   $('vops').textContent = `+${fmt(l.voPerSecond)}/s`;
 
   const line = (name: string, value: string, cls = '') => `<div class="row ${cls}"><span>${name}</span><b>${value}</b></div>`;
@@ -212,7 +211,8 @@ function render(): void {
       line('Spalovna potřebuje', `${fmt(l.voNeedPerSecond, 2)}/s`) +
       line('Autonomie', l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : `✖ chybí ${fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2)} VO/s (najmi brigádníka, kup účinnost nebo klikej)`, l.autonomous ? 'plus' : 'minus') +
       line('Celkem (bez tapů)', signed(voNet), 'total') +
-      line('Sklad', `${fmt(s.vo, 0)} VO`);
+      line('Sklad', `${fmt(s.vo, 0)} / ${fmt(voStorageMax(s), 0)} VO`) +
+      `<small>Co se do skladu nevejde, se automaticky prodá za ${VO_OVERFLOW_PRICE} 💰 za 1 VO.</small>`;
   }
   $('statdetail').innerHTML = detail ? `<div class="card detail">${detail}</div>` : '';
 
