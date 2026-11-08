@@ -1,7 +1,5 @@
 import {
   EFFICIENCY_VO_FACTOR,
-  INCINERATOR_LEVEL_CHANGE_FEE,
-  INCINERATOR_MIN_LOAD,
   UPGRADES,
   VO_PER_TAP,
   WORKER_VO_PER_SECOND,
@@ -59,15 +57,4 @@ export function runWorkers(s: GameState, dt: number): void {
   s.credits -= wage;
   s.vo += workers * WORKER_VO_PER_SECOND * dt;
   s.live.voPerSecond = workers * WORKER_VO_PER_SECOND;
-}
-
-// Ruční změna výkonu spalovny stojí poplatek. S regulátorem to nejde (řídí se sám).
-export function setIncineratorLevel(s: GameState, level: number): boolean {
-  if (s.upgrades.regulator > 0) return false;
-  const l = Math.min(1, Math.max(INCINERATOR_MIN_LOAD, level));
-  if (Math.abs(l - s.incineratorLevel) < 1e-9) return true;
-  if (s.credits < INCINERATOR_LEVEL_CHANGE_FEE) return false; // nikdy do mínusu
-  s.credits -= INCINERATOR_LEVEL_CHANGE_FEE;
-  s.incineratorLevel = l;
-  return true;
 }

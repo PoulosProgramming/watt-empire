@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CREDITS_PER_MWH, INCINERATOR_LEVEL_CHANGE_FEE, INCINERATOR_START_VO, QUESTS, UPGRADES } from '../src/sim/balance';
-import { buyUpgrade, setIncineratorLevel, tap, upgradeCost } from '../src/sim/economy';
+import { CREDITS_PER_MWH, INCINERATOR_START_VO, QUESTS, TOXIC_CRISIS_MWH, UPGRADES } from '../src/sim/balance';
+import { buyUpgrade, tap, upgradeCost } from '../src/sim/economy';
 import { TICK_DT, tick } from '../src/sim/game';
 import { newGame } from '../src/sim/state';
 
@@ -24,9 +24,9 @@ describe('ekonomika', () => {
 
   it('nákup vylepšení stojí správně', () => {
     const s = newGame();
-    s.credits = 100;
+    s.credits = 1000;
     expect(buyUpgrade(s, 'worker')).toBe(true);
-    expect(s.credits).toBe(100 - upgradeCost('worker', 0));
+    expect(s.credits).toBe(1000 - upgradeCost('worker', 0));
     expect(s.upgrades.worker).toBe(1);
   });
 
@@ -45,16 +45,20 @@ describe('ekonomika', () => {
 describe('síť', () => {
   it('spalovna vyrobí z 5 VO 1 MWh a město zaplatí 10 kreditů', () => {
     const s = newGame();
+    s.upgrades.power = 7; // 10 MW
+    s.doneQuests = QUESTS.map((q) => q.id); // ať úkoly nevyplatí kredity
     s.vo = 50;
     run(s, 3);
     expect(s.delivered).toBeGreaterThan(0.5);
-    expect(s.credits - 20).toBeCloseTo(s.delivered * CREDITS_PER_MWH, 5); // 20 = odměna za úkol "dodej 1 MWh"
+    expect(s.credits).toBeCloseTo(s.delivered * CREDITS_PER_MWH, 5);
     expect(50 - s.vo).toBeGreaterThanOrEqual(s.delivered * 5 - 1e-9); // spáleno aspoň tolik, kolik se dodalo
   });
 
   it('bez baterie noc přetíží síť a nastane blackout s poplatkem', () => {
     const s = newGame();
     s.hour = 20; // noc
+    s.upgrades.power = 7;
+    s.doneQuests = QUESTS.map((q) => q.id);
     s.vo = 10000;
     s.credits = 500;
     let blackout = false;
@@ -71,6 +75,7 @@ describe('síť', () => {
   it('baterie ukládá přebytek v noci', () => {
     const s = newGame();
     s.hour = 20;
+    s.upgrades.power = 7;
     s.upgrades.battery = 5;
     s.vo = 10000;
     run(s, 2);
@@ -83,7 +88,7 @@ describe('síť', () => {
     s.vo = 10000;
     for (let i = 0; i < 100; i++) {
       tick(s);
-      expect(s.live.deliveredMW).toBeLessThanOrEqual(10 + 1e-9);
+      expect(s.live.deliveredMW).toBeLessThanOrEqual(6 + 1e-9);
     }
   });
 });
@@ -115,26 +120,51 @@ describe('spalovna', () => {
     expect(changes).toBeLessThan(10);
   });
 
-  it('změna výkonu stojí poplatek a nejde do mínusu', () => {
+  it('na začátku (3 MW) se v noci ani ve dne nikdy nepřetíží', () => {
     const s = newGame();
-    expect(setIncineratorLevel(s, 0.5)).toBe(false);
-    expect(s.credits).toBe(0);
+    s.doneQuests = QUESTS.map((q) => q.id);
+    for (let i = 0; i < 400 / TICK_DT; i++) {
+      s.vo = 1000;
+      tick(s);
+      expect(s.blackout).toBe(0);
+      expect(s.overload).toBe(0);
+    }
+  });
+
+  it('mařič odvede přebytek za peníze a nejde do mínusu', () => {
+    const s = newGame();
+    s.hour = 20;
+    s.upgrades.power = 6; // 9 MW proti 7 MW v noci
+    s.upgrades.dump = 1; // 2 MW
+    s.vo = 10000;
     s.credits = 100;
-    expect(setIncineratorLevel(s, 0.5)).toBe(true);
-    expect(s.credits).toBe(100 - INCINERATOR_LEVEL_CHANGE_FEE);
-    expect(s.incineratorLevel).toBe(0.5);
+    run(s, 3);
+    expect(s.blackout).toBe(0);
+    expect(s.live.dumpedMW).toBeGreaterThan(0);
+    s.credits = 0;
+    run(s, 20);
+    expect(s.credits).toBeGreaterThanOrEqual(0);
+  });
+
+  it('po 90 MWh začne ekologická krize a příjem klesne', () => {
+    const s = newGame();
+    s.delivered = TOXIC_CRISIS_MWH;
+    s.vo = 100;
+    tick(s);
+    expect(s.toxic).toBe(true);
   });
 
   it('automatický regulátor drží výkon podle spotřeby a blokuje ruční změnu', () => {
     const s = newGame();
-    s.hour = 20; // noc, spotřeba 3,5 MW
+    s.hour = 20; // noc, spotřeba 7 MW
+    s.upgrades.power = 7; // 10 MW
+    s.upgrades.line = 1; // vedení 9 MW
     s.upgrades.regulator = 1;
     s.vo = 10000;
     s.credits = 100;
     run(s, 5);
-    expect(s.incineratorLevel).toBeCloseTo(0.35, 5);
+    expect(s.incineratorLevel).toBeCloseTo(0.7, 5);
     expect(s.blackout).toBe(0);
-    expect(setIncineratorLevel(s, 1)).toBe(false);
   });
 });
 

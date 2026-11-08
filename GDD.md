@@ -38,12 +38,12 @@ Hra má tři kapitoly; každou odemyká dodaná energie a s ní prestiž města.
 - **Mapa:** mřížka cca 20×20, viditelná jen malá část, odpadky na zemi. Uprostřed spalovna (2×2), dráty vedou do trafa města v pravém dolním rohu.
 - **Ekonomika:** 5 tapů na odpad = 5 vytříděného odpadu (VO). 5 VO ve spalovně = 1 MWh (výkonem 10 MW). 1 MWh dodaná městu = 10 kreditů.
 - **Vylepšení:** brigádníci (automatický sběr), účinnost spalovny, kapacita drátů a trafa, první baterie (nutné pro noc).
-- **Krize:** po cca 90 MWh vyplivne spalovna toxický odpad (2×2), příjmy města klesnou. To motivuje k postupu do kapitoly 2.
+- **Krize:** po cca 250 MWh vyplivne spalovna toxický odpad (2×2), příjmy města klesnou. To motivuje k postupu do kapitoly 2.
 - **Úkoly místo tutoriálu:** dodej 1 MWh, vyčisti 5 políček, dodej 100 MWh.
 
 ### Kapitola 2: Laboratoř, merge a soláry
 
-Odemyká se po dodání 100 MWh (prestiž města 2).
+Odemyká se po dodání 400 MWh (prestiž města 2; původně 100, zvýšeno po testu tempa).
 
 - **Výzkum (merge minihra):** laboratoř generuje zkumavky, spojováním (1+1=2, 2+2=4) vznikají silnější bloky.
 - **Likvidátor odpadu:** první produkt výzkumu, za poplatek trvale ničí toxický odpad.
@@ -146,5 +146,5 @@ Nejdřív ověřit, že je jádro zábavné bez grafiky, a teprve pak stavět ma
 
 Z prvního hraní na mobilu (kroky 4 a dál):
 - **Rostoucí spotřeba města:** budovy staví hráč kliknutím (krok 4). Navíc může spotřeba pomalu růst s úrovní, ale jen při aktivním hraní, ne offline.
-- **Toxická krize po ~90 MWh** a úkoly od postav (krok 4); brigádníci tam budou omezeni množstvím odpadu na ostrově.
+- **Toxická krize** je zatím jen v číslech (po 250 MWh, příjem 60 %); vizuální toxický odpad a úkoly od postav přijdou v kroku 4; brigádníci tam budou omezeni množstvím odpadu na ostrově.
 - **Tutoriál s postavami** místo textové nápovědy.

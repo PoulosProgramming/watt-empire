@@ -5,8 +5,11 @@ import {
   BLACKOUT_SECONDS,
   CREDITS_PER_MWH,
   DEMAND_PER_PRESTIGE,
+  DUMP_COST_PER_MWH,
+  DUMP_MW_PER_LEVEL,
+  INCINERATOR_BASE_MW,
+  INCINERATOR_POWER_STEP_MW,
   INCINERATOR_MIN_LOAD,
-  INCINERATOR_NOMINAL_MW,
   INCINERATOR_START_VO,
   INCINERATOR_VO_PER_MWH,
   LINE_BASE_CAPACITY_MW,
@@ -14,6 +17,8 @@ import {
   OVERLOAD_TOLERANCE_SECONDS,
   PRESTIGE_THRESHOLDS_MWH,
   SECONDS_PER_GAME_HOUR,
+  TOXIC_CRISIS_MWH,
+  TOXIC_INCOME_FACTOR,
 } from './balance';
 import { baseDemandMW } from './daynight';
 import { voPerMWh } from './economy';
@@ -28,6 +33,9 @@ export function prestige(s: GameState): number {
 }
 
 export const lineCapacityMW = (s: GameState) => LINE_BASE_CAPACITY_MW + s.upgrades.line * LINE_UPGRADE_MW;
+export const incineratorNominalMW = (s: GameState) =>
+  INCINERATOR_BASE_MW + s.upgrades.power * INCINERATOR_POWER_STEP_MW;
+export const dumpCapacityMW = (s: GameState) => s.upgrades.dump * DUMP_MW_PER_LEVEL;
 export const batteryCapacityMWh = (s: GameState) => s.upgrades.battery * BATTERY_CAPACITY_PER_LEVEL_MWH;
 export const batteryRateMW = (s: GameState) => s.upgrades.battery * BATTERY_RATE_PER_LEVEL_MW;
 export const cityDemandMW = (s: GameState) =>
@@ -47,6 +55,7 @@ export function runPower(s: GameState, dt: number): void {
     live.deliveredMW = 0;
     live.batteryFlowMW = 0;
     live.wastedMW = 0;
+    live.dumpedMW = 0;
     live.incomePerSecond = 0;
     return;
   }
@@ -55,13 +64,15 @@ export function runPower(s: GameState, dt: number): void {
   //    a zhasne, když nestačí na další tik. Díky tomu výkon neskáče nahoru a dolů.
   if (s.upgrades.regulator > 0) {
     // Automatický regulátor: výkon podle spotřeby města (a vedení), v mezích spalovny
-    const target = Math.min(live.demandMW, lineCapacityMW(s)) / INCINERATOR_NOMINAL_MW;
+    const target = Math.min(live.demandMW, lineCapacityMW(s)) / incineratorNominalMW(s);
     s.incineratorLevel = Math.min(1, Math.max(INCINERATOR_MIN_LOAD, target));
+  } else {
+    s.incineratorLevel = 1; // bez regulátoru běží spalovna pevným výkonem
   }
   let production = 0;
   if (s.incineratorOn) {
     const vpm = voPerMWh(s, INCINERATOR_VO_PER_MWH);
-    const wantedMW = INCINERATOR_NOMINAL_MW * s.incineratorLevel;
+    const wantedMW = incineratorNominalMW(s) * s.incineratorLevel;
     const neededVO = wantedMW * dtH * vpm;
     if (!s.incineratorRunning && s.vo >= INCINERATOR_START_VO) s.incineratorRunning = true;
     if (s.incineratorRunning) {
@@ -93,13 +104,24 @@ export function runPower(s: GameState, dt: number): void {
     toCity += discharge;
     battery = -discharge;
   }
-  const wasted = Math.max(0, production - Math.min(production, demand, line) - Math.max(0, battery));
+  let wasted = Math.max(0, production - Math.min(production, demand, line) - Math.max(0, battery));
   s.battery = Math.min(batteryCapacityMWh(s), Math.max(0, s.battery + battery * dtH));
 
   // 3) Dodaná energie = peníze
   const mwh = toCity * dtH;
   s.delivered += mwh;
-  s.credits += mwh * CREDITS_PER_MWH;
+  if (s.delivered >= TOXIC_CRISIS_MWH) s.toxic = true;
+  const creditsPerMWh = CREDITS_PER_MWH * (s.toxic ? TOXIC_INCOME_FACTOR : 1);
+  s.credits += mwh * creditsPerMWh;
+
+  // 3b) Mařič spálí přebytek, ale stojí peníze (nikdy do mínusu)
+  let dumped = Math.min(wasted, dumpCapacityMW(s));
+  if (dumped > 0) {
+    const cost = dumped * dtH * DUMP_COST_PER_MWH;
+    if (cost > s.credits) dumped = s.credits / (dtH * DUMP_COST_PER_MWH);
+    s.credits = Math.max(0, s.credits - dumped * dtH * DUMP_COST_PER_MWH);
+    wasted -= dumped;
+  }
 
   // 4) Přetížení
   if (wasted > 0.01) {
@@ -117,6 +139,7 @@ export function runPower(s: GameState, dt: number): void {
   live.deliveredMW = toCity;
   live.batteryFlowMW = battery;
   live.wastedMW = wasted;
-  live.incomePerSecond = (toCity / SECONDS_PER_GAME_HOUR) * CREDITS_PER_MWH;
+  live.dumpedMW = dumped;
+  live.incomePerSecond = (toCity / SECONDS_PER_GAME_HOUR) * creditsPerMWh;
 }
 
