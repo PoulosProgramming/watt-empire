@@ -1,4 +1,17 @@
-import { CONTRACT_MW, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_TRIGGER_QUEST, type QuestDef, type Requirement } from './balance';
+import {
+  CHAPTER_END_QUESTS,
+  LITTER_CLEAN_COUNT,
+  MAX_CHAPTER,
+  ONGOING_UNLOCK_QUEST,
+  PARCEL_START,
+  QUESTS,
+  TOXIC_DELAY_SECONDS,
+  TOXIC_INITIAL_FIELD,
+  TOXIC_TRIGGER_CHAPTER,
+  type QuestDef,
+  type Requirement,
+} from './balance';
+import { connectedCount } from './network';
 import type { GameState } from './state';
 
 export function requirementProgress(s: GameState, r: Requirement): number {
@@ -6,6 +19,16 @@ export function requirementProgress(s: GameState, r: Requirement): number {
   if (r.kind === 'autonomy') return s.live.autonomous ? 1 : 0;
   if (r.kind === 'contract') return s.contractMet ? 1 : 0;
   if (r.kind === 'chapter') return s.chapter;
+  if (r.kind === 'disposed') return s.toxicDisposed;
+  if (r.kind === 'fieldclean') return s.toxic && s.toxicDisposed > 0 && s.toxicField < 0.5 ? 1 : 0;
+  if (r.kind === 'trust') return s.trust;
+  if (r.kind === 'litter') return s.litterCleaned;
+  if (r.kind === 'building') return r.building ? connectedCount(s, r.building) : 0;
+  if (r.kind === 'parcels') return s.unlockedParcels.length - PARCEL_START.length;
+  if (r.kind === 'toxic') return s.toxic ? 1 : 0;
+  if (r.kind === 'litterpile') return s.litter.length;
+  if (r.kind === 'litterlow') return s.litter.length <= LITTER_CLEAN_COUNT ? 1 : 0;
+  if (r.kind === 'litterempty') return s.litterCleaned > 0 && s.litter.length === 0 ? 1 : 0;
   if (r.kind === 'upgrade') return r.upgrade ? s.upgrades[r.upgrade] : 0;
   return s.delivered;
 }
@@ -15,6 +38,8 @@ export const questProgress = (s: GameState, q: QuestDef): number => requirementP
 // Splněné úkoly vyplatí odměnu (jednou).
 export function checkQuests(s: GameState): void {
   for (const q of QUESTS) {
+    if ((q.chapter ?? 1) > s.chapter) continue; // úkol z pozdější kapitoly se ještě nespustil
+    if (q.ongoing && !s.doneQuests.includes(ONGOING_UNLOCK_QUEST)) continue; // průběžné úkoly se počítají až po odemknutí (po autonomii)
     if (!s.doneQuests.includes(q.id) && questProgress(s, q) >= q.target) {
       s.doneQuests.push(q.id);
       s.credits += q.reward;
@@ -23,30 +48,29 @@ export function checkQuests(s: GameState): void {
 }
 
 
-// Ekologická krize: po splnění spouštěcího úkolu začne odpočet a krize se spustí sama (bez varování).
-// Spouštěcí úkol je zatím null (krize patří až do kapitoly 2), proto se nic neděje.
-export function runCrisis(s: GameState, dt: number, triggerQuest: string | null = TOXIC_TRIGGER_QUEST): void {
-  if (s.toxic || !triggerQuest) return;
+// Kapitola postoupí, když jsou splněné všechny její závěrečné úkoly. Vrací číslo nové kapitoly, nebo 0.
+export function advanceChapter(s: GameState): number {
+  if (s.chapter >= MAX_CHAPTER) return 0;
+  const ends = CHAPTER_END_QUESTS[s.chapter] ?? [];
+  if (ends.length > 0 && ends.every((id) => s.doneQuests.includes(id))) {
+    s.chapter += 1;
+    return s.chapter;
+  }
+  return 0;
+}
+
+// Ekologická krize: po začátku kapitoly TOXIC_TRIGGER_CHAPTER začne odpočet a krize se spustí sama
+// (bez varování). Při spuštění je na poli počáteční hromada odpadu.
+export function runCrisis(s: GameState, dt: number, triggerChapter: number = TOXIC_TRIGGER_CHAPTER): void {
+  if (s.toxic) return;
   if (s.toxicCountdown < 0) {
-    if (s.doneQuests.includes(triggerQuest)) s.toxicCountdown = TOXIC_DELAY_SECONDS;
+    if (s.chapter >= triggerChapter) s.toxicCountdown = TOXIC_DELAY_SECONDS;
     return;
   }
   s.toxicCountdown -= dt;
   if (s.toxicCountdown <= 0) {
     s.toxic = true;
     s.toxicCountdown = -1;
+    s.toxicField += TOXIC_INITIAL_FIELD;
   }
-}
-
-// Jak daleko je úkol (0 až 1), pro ukazatel postupu. U smlouvy a autonomie se ukazuje skutečné přiblížení,
-// ne jen 0 nebo 1.
-export function questFraction(s: GameState, q: QuestDef): number {
-  if (s.doneQuests.includes(q.id)) return 1;
-  if (q.kind === 'contract') return s.contractMet ? 1 : Math.min(1, s.live.deliveredMW / CONTRACT_MW);
-  if (q.kind === 'autonomy') {
-    if (s.live.autonomous) return 1;
-    const need = s.live.voNeedPerSecond;
-    return need > 0 ? Math.min(1, s.live.voPerSecond / need) : 0;
-  }
-  return Math.min(1, questProgress(s, q) / q.target);
 }

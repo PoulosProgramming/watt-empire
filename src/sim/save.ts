@@ -1,4 +1,5 @@
-import { TOXIC_TRIGGER_QUEST } from './balance';
+import { LEGACY_UPGRADE_COSTS, TOXIC_TRIGGER_CHAPTER } from './balance';
+import { isLitterTile } from './mapdata';
 import { newGame, type GameState } from './state';
 
 // Ukládání jako text (JSON). Čistý TypeScript: o samotné úložiště (localStorage) se stará UI.
@@ -24,11 +25,20 @@ export function deserialize(text: string | null): GameState | null {
       live: { ...base.live, ...(saved.live ?? {}) },
       doneQuests: Array.isArray(saved.doneQuests) ? saved.doneQuests : [],
     };
-    // Krize se v kapitole 1 nespouští: zrušit ji i ve starších uloženích, kde už začala
-    if (!TOXIC_TRIGGER_QUEST) {
+    // Krize patří až do kapitoly 2: starší uložení z kapitoly 1 s už spuštěnou krizí se vyčistí
+    if (loaded.chapter < TOXIC_TRIGGER_CHAPTER) {
       loaded.toxic = false;
       loaded.toxicCountdown = -1;
     }
+    // Sklad, likvidátor a baterie jsou teď budovy na mapě: staré vylepšení se zruší a peníze se vrátí
+    const legacy = loaded.upgrades as unknown as Record<string, number>;
+    for (const [name, c] of Object.entries(LEGACY_UPGRADE_COSTS)) {
+      const level = Number(legacy[name] ?? 0);
+      for (let k = 0; k < level; k++) loaded.credits += Math.ceil(c.baseCost * Math.pow(c.growth, k));
+      delete legacy[name];
+    }
+    // Mapa se zvětšila a dostala terén: odpad na dlaždicích, kde už ležet nesmí, se zahodí (nový se dosype sám)
+    loaded.litter = loaded.litter.filter((l) => isLitterTile(loaded.unlockedParcels, l.x, l.y));
     return loaded;
   } catch {
     return null;

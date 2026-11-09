@@ -1,6 +1,10 @@
 import './style.css';
 import {
   AUTOSAVE_SECONDS,
+  BUILDINGS,
+  BUILDING_REFUND,
+  PARCEL_UNLOCK_CHAPTER,
+  type BuildingType,
   DEBUG_CREDITS_BONUS,
   DEBUG_SPEEDS,
   EFFICIENCY_VO_FACTOR,
@@ -10,16 +14,19 @@ import {
   SECONDS_PER_GAME_HOUR,
   INCINERATOR_POWER_STEP_MW,
   INCINERATOR_START_VO,
-  TOXIC_INCOME_FACTOR,
+  TOXIC_FIELD_FULL,
   OVERLOAD_TOLERANCE_SECONDS,
   ONGOING_QUESTS_VISIBLE,
-  CHAPTER1_END_QUESTS,
-  CONTRACT_MW,
-  TRACKED_QUESTS,
+  CHAPTER_END_QUESTS,
+  CHAPTER_END_TEXT,
+  CHAPTER_START_TEXT,
+  CHAPTER_TITLES,
+  MAX_CHAPTER,
+  MAYOR_AVATAR,
+  MAYOR_NAME,
   ONGOING_UNLOCK_QUEST,
   QUESTS,
   QUESTS_VISIBLE,
-  STORY_CHAPTER_END,
   STORY_INTRO,
   TOAST_SECONDS,
   TOXIC_POPUP_TEXT,
@@ -28,11 +35,16 @@ import {
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
-import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voPerMWh, voStorageMax } from '../sim/economy';
+import { buyUpgrade, clampVO, isUnlocked, upgradeCost, voPerMWh, voStorageMax } from '../sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../sim/game';
-import { batteryCapacityMWh, cityDemandRangeMW, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige } from '../sim/power';
-import { questFraction, questProgress } from '../sim/quests';
+import { batteryCapacityMWh, cityDemandRangeMW, disposeRate, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige, solarCapacityMW, storageCapacity } from '../sim/power';
+import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
+import { buildingCost, buyParcel, canPlace, demolishAt, parcelCost, parcelsBought, placeBuilding, purchasableParcels, type PlaceReason } from '../sim/build';
+import { collectLitter } from '../sim/litter';
+import { isBuildableTile, isUnlockedTile, parcelIndex } from '../sim/mapdata';
+import { buildingDef, footprint, networkInfo } from '../sim/network';
+import { checkStory, storyText } from '../sim/story';
 import { createMap } from './map';
 import { newGame } from '../sim/state';
 
@@ -54,7 +66,8 @@ function saveNow(): void {
     /* nejde uložit, hra běží dál */
   }
 }
-const state = loadSaved() ?? newGame();
+const savedGame = loadSaved();
+const state = savedGame ?? newGame();
 clampVO(state); // starší uložení mohlo mít víc VO, než se vejde do skladu
 setInterval(() => {
   if (document.visibilityState === 'visible') saveNow(); // v pozadí by to přepsalo čas schování
@@ -80,14 +93,15 @@ app.innerHTML = `
       <button class="stat" data-stat="energy"><b id="energy"></b><small id="power"></small></button>
       <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
     </div>
+    <div id="clock"></div>
+    <div id="modebar"></div>
     <div id="statdetail"></div>
-    <div id="tracker"></div>
     <div id="alerts"></div>
   </div>
-  <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
 
   <nav id="tabs">
     <button class="tab" data-tab="furnace" aria-label="Spalovna">🏭</button>
+    <button class="tab" data-tab="build" aria-label="Stavba">🏗️</button>
     <button class="tab" data-tab="upgrades" aria-label="Vylepšení">🛠️</button>
     <button class="tab" data-tab="quests" aria-label="Úkoly">📋</button>
     <button class="tab" data-tab="net" aria-label="Síť">🔌</button>
@@ -106,7 +120,11 @@ app.innerHTML = `
           <div class="row"><span>Výkon</span><b id="inclevel"></b></div>
           <button id="toggle" style="width:100%;margin-top:6px"></button>
         </div>
+        <div id="waste"></div>
         <div id="incupgrades"></div>
+      </div>
+      <div data-sheet="build" hidden>
+        <div id="buildmenu"></div>
       </div>
       <div data-sheet="upgrades" hidden>
         <div id="upgrades"></div>
@@ -123,11 +141,13 @@ app.innerHTML = `
       <div data-sheet="info" hidden>
         <div class="card story">📖 ${STORY_INTRO}</div>
         <div id="ending"></div>
+        <h2>Zprávy od starosty</h2>
+        <div class="card" id="mayorlog"></div>
         <div class="card help">
           <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
-          <p>Začni klepáním na odpad, pak najmi brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
+          <p><b>Klepej na odpad na mapě</b> (🥤 📦 🗑️): každé klepnutí vytřídí 1 ♻️ VO a po 5 klepnutích hromádka zmizí. Nový odpad se objevuje pomalu, takže potřebuješ i brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
           <p>Máš <b>smlouvu na stálých 15 MW</b>, den i noc. Za kredity zvyšuj <b>výkon</b> spalovny a vedení (dráty a trafo), ať městu dodáš celých 15 MW. Pozor: vedení musí unést tvůj výkon, jinak se síť přetíží a přijde ⚫ blackout.</p>
-          <p>Mapu posuneš tažením prstu a přiblížíš dvěma prsty. Záložky vpravo otevírají menu: 🏭 spalovna, 🛠️ vylepšení, 📋 úkoly, 🔌 síť, 📖 nápověda, ⚙️ ladění.</p>
+          <p>Mapu posuneš tažením prstu a přiblížíš dvěma prsty; klepnutím na odpad ho vytřídíš. Záložky vpravo otevírají menu: 🏭 spalovna, 🛠️ vylepšení, 📋 úkoly, 🔌 síť, 📖 nápověda, ⚙️ ladění.</p>
         </div>
       </div>
       <div data-sheet="debug" hidden>
@@ -168,13 +188,50 @@ function showModal(title: string, text: string, good = false): void {
   overlay.querySelector('button')!.addEventListener('click', () => overlay.remove());
   document.body.appendChild(overlay);
 }
-// Velký popup na konci kapitoly 1 (jednou; po načtení hry s už dokončenou kapitolou se neukazuje)
-const chapter1Done = () => CHAPTER1_END_QUESTS.every((id) => state.doneQuests.includes(id));
-let seenEnd = chapter1Done();
-function announceEnd(): void {
-  if (!seenEnd && chapter1Done()) {
-    seenEnd = true;
-    showModal('🏁 Konec kapitoly 1', STORY_CHAPTER_END, true);
+// Starosta: scénky se ukazují v okénku s dialogem, jedna po druhé. Po načtení uložené hry se už proběhlé neukazují.
+checkStory(state);
+let seenStory = savedGame ? state.story.length : 0;
+const dialogQueue: string[] = [];
+let dialogOpen = false;
+function showNextDialog(): void {
+  if (dialogOpen) return;
+  const id = dialogQueue.shift();
+  if (!id) return;
+  const text = storyText(id);
+  if (!text) return showNextDialog();
+  dialogOpen = true;
+  const el = document.createElement('div');
+  el.className = 'dialog';
+  el.innerHTML = `<div class="dlg-avatar">${MAYOR_AVATAR}</div><div class="dlg-body"><b>${MAYOR_NAME}</b><p>${text}</p><button class="dlg-ok">OK</button></div>`;
+  el.querySelector('button')!.addEventListener('click', () => {
+    el.remove();
+    dialogOpen = false;
+    showNextDialog();
+  });
+  document.body.appendChild(el);
+}
+function announceStory(): void {
+  while (seenStory < state.story.length) {
+    dialogQueue.push(state.story[seenStory++]);
+    if (dialogQueue.length > 3) dialogQueue.shift(); // po delší pauze jen poslední tři
+  }
+  showNextDialog();
+}
+
+// Velký popup při postupu do další kapitoly a na konci poslední (po načtení hry se už proběhlé neukazují)
+const chapterDone = (n: number) => (CHAPTER_END_QUESTS[n] ?? []).every((id) => state.doneQuests.includes(id));
+let seenChapter = state.chapter;
+let seenFinal = state.chapter === MAX_CHAPTER && chapterDone(MAX_CHAPTER);
+function announceChapter(): void {
+  if (state.chapter > seenChapter) {
+    const prev = seenChapter;
+    seenChapter = state.chapter;
+    const start = CHAPTER_START_TEXT[state.chapter] ? ` ${CHAPTER_START_TEXT[state.chapter]}` : '';
+    showModal(`🏁 Konec kapitoly ${prev}`, `${CHAPTER_END_TEXT[prev]}${start}`, true);
+  }
+  if (!seenFinal && state.chapter === MAX_CHAPTER && chapterDone(MAX_CHAPTER)) {
+    seenFinal = true;
+    showModal(`🏁 Konec kapitoly ${MAX_CHAPTER}`, CHAPTER_END_TEXT[MAX_CHAPTER], true);
   }
 }
 function announceCrisis(): void {
@@ -214,16 +271,125 @@ runOffline(); // po načtení hry dopočítat čas, kdy hráč nehrál
 
 const $ = (id: string) => document.getElementById(id)!;
 
-// Sledování úkolů: klepnutím na hlavičku se sbalí na jeden řádek s ukazatelem kapitoly
-let trackerCollapsed = false;
-// (reaguje při stisku, protože se obsah překresluje několikrát za sekundu a při 'click' by se prvek mezi stiskem a pustěním vyměnil)
-$('tracker').addEventListener('pointerdown', (e) => {
-  if ((e.target as HTMLElement).closest('.tr-head')) trackerCollapsed = !trackerCollapsed;
+// ---- Stavění: režimy (stavět / zbourat / koupit parcelu), menu a klepnutí na mapu ----
+type Mode = { kind: 'none' } | { kind: 'build'; type: BuildingType } | { kind: 'demolish' } | { kind: 'parcel' };
+let mode: Mode = { kind: 'none' };
+const BUILD_MESSAGES: Record<Exclude<PlaceReason, 'ok'>, string> = {
+  chapter: 'Tohle se dá stavět až v pozdější kapitole.',
+  locked: 'Tohle území je zamčené (v mlze). Dokup parcelu.',
+  terrain: 'Tady se stavět nedá (voda, hory, keř, skála nebo jiná stavba).',
+  occupied: 'Tady už něco stojí.',
+  cost: 'Nemáš dost kreditů.',
+};
+function buildToast(html: string): void {
+  document.querySelectorAll('.toast-build').forEach((e) => e.remove()); // ať se hlášky nehromadí
+  showToast(html);
+  toasts.lastElementChild?.classList.add('toast-build');
+}
+function setMode(m: Mode): void {
+  mode = m;
+  lastModebar = '';
+  lastBuildHtml = '';
+}
+let lastBuildHtml = '';
+let lastModebar = '';
+
+function renderBuildMenu(): void {
+  const s = state;
+  const info = networkInfo(s);
+  const unconnected = info.connected.filter((c) => !c).length;
+  const rows = BUILDINGS.map((d) => {
+    if (s.chapter < d.unlockChapter) return `<div class="bld locked">🔒 <b>${d.name}</b><small>Odemkne se v kapitole ${d.unlockChapter}.</small></div>`;
+    const cost = buildingCost(s, d.type);
+    const poor = s.credits < cost;
+    const sel = mode.kind === 'build' && mode.type === d.type;
+    return `<button class="bld${sel ? ' sel' : ''}" data-build="${d.type}"><span class="bld-ico">${d.emoji}</span><span class="bld-txt"><b>${d.name} (${d.w}×${d.h})</b><small>${d.description}</small></span><span class="bld-cost${poor ? ' poor' : ''}">💰 ${cost}</span></button>`;
+  }).join('');
+  const parcelOpen = s.chapter >= PARCEL_UNLOCK_CHAPTER;
+  const parcelBtn = parcelOpen
+    ? `<button class="bld${mode.kind === 'parcel' ? ' sel' : ''}" data-mode="parcel"><span class="bld-ico">🗺️</span><span class="bld-txt"><b>Dokoupit území (parcela 4×4)</b><small>Klepni na zamlžený kus země vedle odemčeného. Dokoupeno: ${parcelsBought(s)}.</small></span><span class="bld-cost${s.credits < parcelCost(s) ? ' poor' : ''}">💰 ${parcelCost(s)}</span></button>`
+    : `<div class="bld locked">🔒 <b>Dokoupit území</b><small>Odemkne se v kapitole ${PARCEL_UNLOCK_CHAPTER}.</small></div>`;
+  const demo = `<button class="bld${mode.kind === 'demolish' ? ' sel' : ''}" data-mode="demolish"><span class="bld-ico">🧹</span><span class="bld-txt"><b>Zbourat budovu</b><small>Klepni na budovu na mapě. Vrátí se ${Math.round(BUILDING_REFUND * 100)} % ceny.</small></span></button>`;
+  const status = `<small class="bld-status">Postaveno: ${s.buildings.length}${unconnected > 0 ? ` · ⚠️ nenapojených: ${unconnected}` : ''}</small>`;
+  const html = `${status}${rows}${parcelBtn}${demo}`;
+  if (html !== lastBuildHtml) {
+    $('buildmenu').innerHTML = html;
+    lastBuildHtml = html;
+  }
+}
+
+function renderModebar(): void {
+  let html = '';
+  if (mode.kind === 'build') {
+    const d = buildingDef(mode.type);
+    html = `🏗️ Stavím: <b>${d.name}</b> · 💰 ${buildingCost(state, mode.type)} · klepni na mapu <button class="modeoff">✕ Hotovo</button>`;
+  } else if (mode.kind === 'demolish') html = `🧹 Bourání: klepni na budovu <button class="modeoff">✕ Hotovo</button>`;
+  else if (mode.kind === 'parcel') html = `🗺️ Koupě území: klepni na zlatě ohraničenou parcelu · 💰 ${parcelCost(state)} <button class="modeoff">✕ Hotovo</button>`;
+  if (html !== lastModebar) {
+    $('modebar').innerHTML = html;
+    $('modebar').style.display = html ? 'block' : 'none';
+    lastModebar = html;
+  }
+}
+
+$('buildmenu').addEventListener('click', (e) => {
+  const el = (e.target as HTMLElement).closest<HTMLElement>('[data-build],[data-mode]');
+  if (!el) return;
+  if (el.dataset.build) setMode({ kind: 'build', type: el.dataset.build as BuildingType });
+  else if (el.dataset.mode === 'demolish') setMode({ kind: 'demolish' });
+  else if (el.dataset.mode === 'parcel') setMode({ kind: 'parcel' });
+  showTab(''); // menu se zavře, ať je vidět mapa
 });
+$('modebar').addEventListener('click', (e) => {
+  if ((e.target as HTMLElement).closest('.modeoff')) setMode({ kind: 'none' });
+});
+
+function confirmDialog(text: string, yes: string, onYes: () => void): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal good"><h3>🗺️ Koupě území</h3><p>${text}</p><button class="modal-ok" data-yes>${yes}</button><button class="modal-cancel" data-no>Zrušit</button></div>`;
+  overlay.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-yes]')) {
+      overlay.remove();
+      onYes();
+    } else if (target.closest('[data-no]') || target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+
+// Klepnutí na dlaždici mapy: v režimu stavění ho zpracuje stavba, jinak se klepnutí nechá na třídění odpadu (vrací false)
+function onTileTap(x: number, y: number): boolean {
+  if (mode.kind === 'build') {
+    const r = placeBuilding(state, mode.type, x, y);
+    if (r !== 'ok') buildToast(`🏗️ ${BUILD_MESSAGES[r]}${r === 'cost' ? ` (cena ${buildingCost(state, mode.type)})` : ''}`);
+    return true;
+  }
+  if (mode.kind === 'demolish') {
+    const r = demolishAt(state, x, y);
+    buildToast(r ? `🧹 Zbouráno: ${buildingDef(r.type).name}. Vráceno 💰 ${r.refund}.` : '🧹 Tady nic nestojí.');
+    return true;
+  }
+  if (mode.kind === 'parcel') {
+    const idx = parcelIndex(x, y);
+    if (!purchasableParcels(state).includes(idx)) {
+      buildToast(isUnlockedTile(state.unlockedParcels, x, y) ? '🗺️ Tohle území už máš.' : '🗺️ Tuhle parcelu koupit nejde (musí sousedit s odemčeným územím a mít pevninu).');
+      return true;
+    }
+    const cost = parcelCost(state);
+    confirmDialog(`Dokoupit parcelu za <b>💰 ${cost}</b>? Odemkne se nové území pro stavění a uklízení.`, `Koupit za ${cost}`, () => {
+      const r = buyParcel(state, idx);
+      buildToast(r === 'ok' ? '🗺️ Parcela koupena! Mlha zmizí a můžeš tu stavět.' : r === 'cost' ? '🗺️ Nemáš dost kreditů.' : '🗺️ Tuhle parcelu koupit nejde.');
+    });
+    return true;
+  }
+  return false;
+}
 
 // Záložky na boku: klepnutí otevře menu přes mapu, další klepnutí (nebo ✕) ho zavře
 const TAB_TITLES: Record<string, string> = {
   furnace: '🏭 Spalovna',
+  build: '🏗️ Stavba',
   upgrades: '🛠️ Vylepšení',
   quests: '📋 Úkoly',
   net: '🔌 Síť',
@@ -243,7 +409,6 @@ document.querySelectorAll<HTMLElement>('.tab').forEach((el) =>
 );
 $('sheetclose').addEventListener('click', () => showTab(''));
 
-$('tap').addEventListener('click', () => tap(state));
 $('toggle').addEventListener('click', () => {
   state.incineratorOn = !state.incineratorOn;
 });
@@ -280,11 +445,13 @@ $('debug').appendChild(resetBtn);
 $('bonus').addEventListener('click', () => (state.credits += DEBUG_CREDITS_BONUS));
 
 function render(): void {
+  renderBuildMenu();
+  renderModebar();
   const s = state;
   const l = s.live;
   $('credits').textContent = `💰 ${Math.floor(s.credits)}`;
   {
-    const n = l.incomePerSecond + l.overflowIncomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
+    const n = l.incomePerSecond + l.overflowIncomePerSecond - l.wagePerSecond - l.dumpCostPerSecond - l.disposeCostPerSecond;
     $('income').textContent = `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n))}/s`;
   }
   $('energy').textContent = `⚡ ${fmt(l.productionMW)} MW`;
@@ -294,22 +461,24 @@ function render(): void {
 
   const line = (name: string, value: string, cls = '') => `<div class="row ${cls}"><span>${name}</span><b>${value}</b></div>`;
   const signed = (n: number) => `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n), 2)}/s`;
-  const net = l.incomePerSecond + l.overflowIncomePerSecond - l.wagePerSecond - l.dumpCostPerSecond;
+  const net = l.incomePerSecond + l.overflowIncomePerSecond - l.wagePerSecond - l.dumpCostPerSecond - l.disposeCostPerSecond;
   let detail = '';
   if (openStat === 'credits') {
     detail =
       line('Prodej energie městu (běžná cena)', `+${fmt(l.incomePerSecond + l.crisisLossPerSecond, 2)}/s`, 'plus') +
-      (s.toxic ? line('☣️ Ekologická krize (město platí jen ' + Math.round(TOXIC_INCOME_FACTOR * 100) + ' %)', `−${fmt(l.crisisLossPerSecond, 2)}/s`, 'minus') : '') +
+      (s.toxic ? line('☣️ Odpad na poli (město platí ' + Math.round(l.priceFactor * 100) + ' % ceny)', `−${fmt(l.crisisLossPerSecond, 2)}/s`, 'minus') : '') +
       line('Prodej přebytečného VO (plný sklad)', `+${fmt(l.overflowIncomePerSecond, 2)}/s`, 'plus') +
       line('Mzdy brigádníků', `−${fmt(l.wagePerSecond, 2)}/s`, 'minus') +
       line('Mařič přebytku', `−${fmt(l.dumpCostPerSecond, 2)}/s`, 'minus') +
+      (s.toxic ? line('Likvidace odpadu', `−${fmt(l.disposeCostPerSecond, 2)}/s`, 'minus') : '') +
       line('Celkem', signed(net), 'total') +
-      (s.toxic ? '<small>Krizi vyřeší až kapitola 2 (likvidátor odpadu).</small>' : '');
+      (s.toxic ? '<small>Čím míň odpadu leží na poli, tím víc město zaplatí. Odpad uskladni nebo zlikviduj.</small>' : '');
   } else if (openStat === 'energy') {
     const toBattery = Math.max(0, l.batteryFlowMW);
     const fromBattery = Math.max(0, -l.batteryFlowMW);
     detail =
       line('Výroba spalovny', `${fmt(l.productionMW)} MW`, 'plus') +
+      (solarCapacityMW(s) > 0 ? line('☀️ Sluneční panely', `${fmt(l.solarMW)} / ${solarCapacityMW(s)} MW`, 'plus') : '') +
       line('Z baterie', `+${fmt(fromBattery)} MW`, fromBattery > 0.01 ? 'plus' : '') +
       line('Do baterie', `−${fmt(toBattery)} MW`, toBattery > 0.01 ? 'minus' : '') +
       line('Spálí mařič', `−${fmt(l.dumpedMW)} MW`, l.dumpedMW > 0.01 ? 'minus' : '') +
@@ -323,7 +492,7 @@ function render(): void {
     const voNet = l.voPerSecond - l.voBurnedPerSecond;
     detail =
       line('Brigádníci', `+${fmt(l.voPerSecond, 2)}/s`, 'plus') +
-      line('Ruční třídění', `${s.taps} tapů celkem`) +
+      line('Ruční třídění', `${s.taps} klepnutí, ${s.litterCleaned} hromádek`) +
       line('Spálí spalovna', `−${fmt(l.voBurnedPerSecond, 2)}/s`, 'minus') +
       line('Spalovna potřebuje', `${fmt(l.voNeedPerSecond, 2)}/s`) +
       line('Autonomie', l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : `✖ chybí ${fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2)} VO/s (najmi brigádníka, kup účinnost nebo klikej)`, l.autonomous ? 'plus' : 'minus') +
@@ -337,6 +506,7 @@ function render(): void {
 
   const hh = Math.floor(s.hour).toString().padStart(2, '0');
   const mm = Math.floor((s.hour % 1) * 60).toString().padStart(2, '0');
+  $('clock').textContent = `${isDay(s.hour) ? '☀️' : '🌙'} Den ${s.day} · ${hh}:${mm}`;
   const dayNight = isDay(s.hour) ? '<span class="day">☀️ den</span>' : '<span class="night">🌙 noc</span>';
   const bcap = batteryCapacityMWh(s);
   const range = cityDemandRangeMW(s);
@@ -345,7 +515,7 @@ function render(): void {
     <div class="row"><span>Čas</span><b>Den ${s.day}, ${hh}:${mm} ${dayNight}</b></div>
     <div class="row"><span>Prestiž města</span><b>${prestige(s)}</b></div>
     <div class="row"><span>Spotřeba města</span><b>${fmt(l.demandMW)} MW</b></div>
-    <div class="row"><span>Smlouva (stálý odběr)</span><b>${fmt(range.max)} MW, den i noc</b></div>
+    <div class="row"><span>${s.chapter >= 2 ? 'Odběr města (bere, co vedení unese)' : 'Smlouva (stálý odběr)'}</span><b>${s.chapter >= 2 ? fmt(range.max) + ' MW' : fmt(range.max) + ' MW, den i noc'}</b></div>
     <div class="row"><span>Výroba</span><b>${fmt(l.productionMW)} MW</b></div>
     <div class="row"><span>Dodáváme</span><b>${fmt(l.deliveredMW)} / ${lineCapacityMW(s)} MW (vedení)</b></div>
     <div class="row"><span>Baterie</span><b>${fmt(s.battery)} / ${bcap} MWh ${l.batteryFlowMW > 0.01 ? '⬆' : l.batteryFlowMW < -0.01 ? '⬇' : ''}</b></div>
@@ -356,7 +526,7 @@ function render(): void {
   let alerts = '';
   if (s.blackout > 0) alerts += `<div class="alert">⚫ BLACKOUT! Síť naběhne za ${Math.ceil(s.blackout)} s</div>`;
   else if (s.overload > 0.5) alerts += `<div class="alert warn">⚠️ Síť se přetěžuje! Kup mařič nebo baterii, nebo vypni spalovnu.</div>`;
-  if (s.toxic) alerts += `<div class="alert warn">☣️ Ekologická krize! Spalovna vyplivla toxický odpad, město platí jen ${Math.round(TOXIC_INCOME_FACTOR * 100)} %. Řešení přijde v kapitole 2.</div>`;
+  if (s.toxic && s.toxicField > 0.5) alerts += `<div class="alert warn">☣️ Na poli leží ${fmt(s.toxicField, 0)} j. odpadu, město platí jen ${Math.round(l.priceFactor * 100)} % ceny.</div>`;
   if (l.workersPaused) alerts += `<div class="alert warn">💸 Brigádníci stojí: nejsou peníze na mzdy.</div>`;
   $('alerts').innerHTML = alerts;
 
@@ -383,9 +553,9 @@ function render(): void {
     let desc = def.description;
     if (def.id === 'power' && !max) {
       const next = incineratorNominalMW(s) + INCINERATOR_POWER_STEP_MW;
-      if (next > range.max) desc = `⚠️ Po koupi ${next} MW, ale město odebere jen ${fmt(range.max)} MW (smlouva).`;
+      if (s.chapter < 2 && next > range.max) desc = `⚠️ Po koupi ${next} MW, ale město odebere jen ${fmt(range.max)} MW (smlouva).`;
       else if (next > lineCapacityMW(s)) desc = `⚠️ Po koupi ${next} MW, ale vedení unese jen ${lineCapacityMW(s)} MW. Potřebuješ dráty a trafo.`;
-      else desc = `Po koupi ${next} MW z ${fmt(range.max)} MW smluvních.`;
+      else desc = s.chapter >= 2 ? `Po koupi ${next} MW. Vedení unese ${lineCapacityMW(s)} MW.` : `Po koupi ${next} MW z ${fmt(range.max)} MW smluvních.`;
     }
     if (def.id === 'efficiency' && !max) {
       const now = (incineratorNominalMW(s) * s.incineratorLevel / SECONDS_PER_GAME_HOUR) * voPerMWh(s, INCINERATOR_VO_PER_MWH);
@@ -394,11 +564,39 @@ function render(): void {
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
 
-  const mainQuests = QUESTS.filter((q) => !q.ongoing);
+  // Zprávy od starosty (posledních 8, nejnovější nahoře)
+  $('mayorlog').innerHTML =
+    s.story
+      .slice(-8)
+      .reverse()
+      .map((id) => storyText(id))
+      .filter((x): x is string => !!x)
+      .map((x) => `<p class="mayor-msg">${MAYOR_AVATAR} ${x}</p>`)
+      .join('') || '<small>Zatím žádné zprávy.</small>';
+
+  // Odpad (od kapitoly 2) a důvěra veřejnosti (od kapitoly 3)
+  let waste = '';
+  if (s.toxic) {
+    waste +=
+      line('☣️ Odpad na poli', `${fmt(s.toxicField, 0)} / ${TOXIC_FIELD_FULL} j.`, s.toxicField > 0.5 ? 'minus' : 'plus') +
+      line('Sklad odpadu', `${fmt(s.toxicStored, 0)} / ${storageCapacity(s)} j.`) +
+      line('Cena energie', `${Math.round(l.priceFactor * 100)} % (odpad na poli ji snižuje${s.chapter >= 3 ? ', důvěra zvedá' : ''})`, l.priceFactor < 0.999 ? 'minus' : 'plus') +
+      line('Likvidace', `${fmt(l.disposePerSecond, 2)} / ${fmt(disposeRate(s), 1)} j/s · ${fmt(l.disposeCostPerSecond, 2)} 💰/s`) +
+      line('Zlikvidováno celkem', `${fmt(s.toxicDisposed, 0)} j.`);
+  }
+  if (s.chapter >= 3) {
+    waste +=
+      line('☀️ Sluneční panely', `${fmt(l.solarMW)} / ${solarCapacityMW(s)} MW (jen ve dne)`) +
+      line('🤝 Důvěra veřejnosti', `${fmt(s.trust, 0)} %`) +
+      `<div class="bar trust"><i style="width:${Math.round(s.trust)}%"></i></div>`;
+  }
+  $('waste').innerHTML = waste ? `<div class="card">${waste}</div>` : '';
+
+  const mainQuests = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) === s.chapter);
   const mainDone = mainQuests.filter((q) => s.doneQuests.includes(q.id)).length;
-  const chapterDone = CHAPTER1_END_QUESTS.every((id) => s.doneQuests.includes(id));
-  $('ending').innerHTML = chapterDone
-    ? `<div class="card ending"><b>🏁 Konec kapitoly 1</b><p>${STORY_CHAPTER_END}</p></div>`
+  const finalDone = s.chapter === MAX_CHAPTER && chapterDone(MAX_CHAPTER);
+  $('ending').innerHTML = finalDone
+    ? `<div class="card ending"><b>🏁 Konec kapitoly ${MAX_CHAPTER}</b><p>${CHAPTER_END_TEXT[MAX_CHAPTER]}</p></div>`
     : '';
 
   const questRow = (q: (typeof QUESTS)[number]) => {
@@ -406,37 +604,15 @@ function render(): void {
     return `<div class="row quest"><span>${q.text}</span><span>${fmt(p, 0)}/${q.target} (+${q.reward}💰)</span></div>`;
   };
 
-  const open = mainQuests.filter((q) => !s.doneQuests.includes(q.id));
+  // nejdřív nesplněné úkoly aktuální kapitoly, pak případné nedokončené z dřívějších
+  const leftovers = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) < s.chapter && !s.doneQuests.includes(q.id));
+  const open = [...mainQuests.filter((q) => !s.doneQuests.includes(q.id)), ...leftovers];
   const shown = open.slice(0, QUESTS_VISIBLE);
   $('quests').innerHTML =
+    `<div class="row"><b>Kapitola ${s.chapter}: ${CHAPTER_TITLES[s.chapter]}</b></div>` +
     `<div class="row"><span>Splněno</span><b>${mainDone} / ${mainQuests.length}</b></div>` +
     shown.map(questRow).join('') +
     (open.length > shown.length ? `<small>…a ${open.length - shown.length} dalších úkolů se odemkne postupně.</small>` : '');
-
-  // Sledování úkolů na obrazovce: vždy až TRACKED_QUESTS aktivních úkolů s ukazatelem postupu
-  // (nejdřív hlavní, když jich zbývá méně, doplní se průběžnými) a ukazatel postupu kapitoly
-  const ongoingNow = QUESTS.filter(
-    (q) => q.ongoing && !s.doneQuests.includes(q.id) && (!q.upgrade || isUnlocked(s, q.upgrade)),
-  );
-  const tracked = [...open, ...(s.doneQuests.includes(ONGOING_UNLOCK_QUEST) ? ongoingNow : [])].slice(0, TRACKED_QUESTS);
-  const progressLabel = (q: (typeof QUESTS)[number]): string => {
-    if (q.kind === 'contract') return `${fmt(s.live.deliveredMW)} / ${CONTRACT_MW} MW`;
-    if (q.kind === 'autonomy') return `${fmt(s.live.voPerSecond, 1)} / ${fmt(s.live.voNeedPerSecond, 1)} VO/s`;
-    const done = Math.min(q.target, questProgress(s, q));
-    return q.kind === 'delivered' ? `${fmt(done, 0)} / ${q.target} MWh` : `${fmt(done, 0)} / ${q.target}`;
-  };
-  const chapterPct = Math.round((mainDone / mainQuests.length) * 100);
-  $('tracker').innerHTML =
-    `<div class="tr-head"><span>${trackerCollapsed ? '▸' : '▾'} Kapitola 1 · ${mainDone} / ${mainQuests.length} úkolů</span><span>${chapterPct} %</span></div>` +
-    `<div class="bar chap"><i style="width:${chapterPct}%"></i></div>` +
-    (trackerCollapsed
-      ? ''
-      : tracked
-          .map((q) => {
-            const pct = Math.round(questFraction(s, q) * 100);
-            return `<div class="tr-row"><div class="tr-top"><span>${q.ongoing ? '🔁 ' : ''}${q.text}</span><span>${progressLabel(q)} · +${q.reward}💰</span></div><div class="bar q"><i style="width:${pct}%"></i></div></div>`;
-          })
-          .join(''));
 
   // Průběžné úkoly: dál vylepšovat; ukáží se jen ty, jejichž vylepšení už je odemčené
   const ongoing = QUESTS.filter(
@@ -464,7 +640,27 @@ createMap($('map'), () => ({
   voMax: voStorageMax(state),
   incomePerSecond: state.live.incomePerSecond + state.live.overflowIncomePerSecond - state.live.wagePerSecond - state.live.dumpCostPerSecond,
   isNight: !isDay(state.hour),
-}));
+  toxic: state.toxic,
+  toxicField: state.toxicField,
+  toxicFieldFull: TOXIC_FIELD_FULL,
+  toxicStored: state.toxicStored,
+  storageCap: storageCapacity(state),
+  solarLevel: state.upgrades.solar,
+  solarMW: state.live.solarMW,
+  solarCapMW: solarCapacityMW(state),
+  litter: state.litter,
+  unlocked: state.unlockedParcels,
+  buildings: state.buildings.map((b, i) => {
+    const d = buildingDef(b.type);
+    return { type: b.type, x: b.x, y: b.y, w: d.w, h: d.h, emoji: d.emoji, color: d.color, connected: networkInfo(state).connected[i] ?? true };
+  }),
+  mode: mode.kind,
+  ghost: mode.kind === 'build' ? { w: buildingDef(mode.type).w, h: buildingDef(mode.type).h, valid: (x: number, y: number) => canPlace(state, (mode as { type: BuildingType }).type, x, y) === 'ok' } : null,
+  freeTile: (x: number, y: number) =>
+    isUnlockedTile(state.unlockedParcels, x, y) && isBuildableTile(x, y) && !state.buildings.some((b) => footprint(b).some((t) => t.x === x && t.y === y)),
+  purchasable: purchasableParcels(state),
+  parcelCost: parcelCost(state),
+}), (x, y) => collectLitter(state, x, y), onTileTap);
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce
 let last = performance.now();
@@ -478,7 +674,8 @@ function frame(now: number): void {
   }
   announceQuests();
   announceCrisis();
-  announceEnd();
+  announceChapter();
+  announceStory();
   render();
   requestAnimationFrame(frame);
 }

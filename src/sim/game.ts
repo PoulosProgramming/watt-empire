@@ -8,8 +8,10 @@ import {
 } from './balance';
 import { advanceTime } from './daynight';
 import { runWorkers, updateOverflowRate } from './economy';
+import { runLitter } from './litter';
 import { runPower } from './power';
-import { checkQuests, runCrisis } from './quests';
+import { advanceChapter, checkQuests, runCrisis } from './quests';
+import { checkStory } from './story';
 import type { GameState } from './state';
 
 export const TICK_DT = 1 / TICKS_PER_SECOND;
@@ -18,10 +20,13 @@ export const TICK_DT = 1 / TICKS_PER_SECOND;
 export function tick(s: GameState, dt: number = TICK_DT): void {
   advanceTime(s, dt);
   runWorkers(s, dt);
+  runLitter(s, dt);
   updateOverflowRate(s, dt);
   runPower(s, dt);
   checkQuests(s);
+  advanceChapter(s);
   runCrisis(s, dt);
+  checkStory(s);
 }
 
 export interface OfflineSummary {

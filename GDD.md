@@ -38,7 +38,7 @@ Hra má **pět kapitol**, každou odemyká splnění cíle předchozí. Vše je 
 Hráč je spalovna, která zásobuje ostrov. Má **nasmlouvanou dodávku 15 MW, kterou musí městu dávat stabilně, bez ohledu na den a noc**. To je hlavní bod kapitoly: začít vyrábět stabilně a dodat městu smluvních 15 MW.
 
 - **Mapa:** mřížka cca 20×20, viditelná jen malá část, odpadky na zemi. Uprostřed spalovna (2×2), dráty vedou do trafa města v pravém dolním rohu.
-- **Ekonomika:** 5 tapů na odpad = 5 vytříděného odpadu (VO). 5 VO ve spalovně = 1 MWh. 1 MWh dodaná městu = 10 kreditů. Spalovna začíná na 3 MW, výkon se zvyšuje nákupem (až na 15 MW).
+- **Ekonomika:** odpad je rozsetý po mapě, klepnutí na hromádku = 1 vytříděný odpad (VO), po 5 klepnutích hromádka zmizí (nový odpad se objevuje pomalu). 5 VO ve spalovně = 1 MWh. 1 MWh dodaná městu = 10 kreditů. Spalovna začíná na 3 MW, výkon se zvyšuje nákupem (až na 15 MW).
 - **Vylepšení:** brigádníci (automatický sběr, max 6), výkon a účinnost spalovny, kapacita drátů a trafa (nutná pro výkon nad 6 MW).
 - **Bez regulace:** čím víc hráč vyrábí, tím víc město odebírá (až do smluvních 15 MW). Regulátor, baterie ani mařič v kapitole 1 nejsou.
 - **Úkoly místo tutoriálu**, hlavní úkoly odemykají technologie a dávají bonusy; průběžné úkoly (po autonomii) dávají peníze za další vylepšování.
@@ -50,7 +50,7 @@ Přijde problém: **odpad ze spalovny**. Lidé se bouří, město platí méně 
 
 - Hráč začne odpad **likvidovat a rozebírat** (v budoucnu merge minihra), pak ho **uskladňovat a nevyhazovat na pole**.
 - **Regulace stále není potřeba:** čím víc se vyrábí, tím víc město odebírá, byť za snížený poplatek.
-- Ekologická katastrofa (toxický odpad 2×2 na mapě, velký popup, příjem 60 %) je v kódu nachystaná, spouští se až tady.
+- Ekologická katastrofa (toxický odpad na mapě, velký popup) se spouští 15 s po začátku kapitoly. **První verze v kódu:** odpad ze spalovny se ukládá do skladu nebo leží na poli (snižuje cenu až o 40 %); likvidátor ho ničí za peníze; od kapitoly 2 město bere vše, co unese vedení.
 
 ### Kapitola 3: Čistý zdroj a obnovitelné zdroje
 
@@ -58,6 +58,7 @@ Přijde problém: **odpad ze spalovny**. Lidé se bouří, město platí méně 
 - Vytříděný toxický odpad něco stojí a začne zabírat vzácnou hrací plochu; vyčistit ji stojí hodně peněz.
 - **Odemykají se obnovitelné zdroje (OZE):** soláry (panely 1×1 lepené k sobě, přes střídač s trafem, jen ve dne), hory (rozbitá přehrada, vyrábí 24/7, drahé vysoké napětí) a oceán (offshore vítr, výkon kolísá).
 - Odemykají se také **baterie** a **mařič přebytku** (s OZE vznikají přebytky).
+- **První verze v kódu:** sluneční panely (jen ve dne), důvěra veřejnosti (roste s čistou energií a likvidací odpadu, klesá s odpadem na poli; při 100 % město platí o 20 % víc). Polední špička ze slunce přetěžuje vedení, proto je potřeba vedení, baterie a mařič. Hory a oceán zatím nejsou.
 
 ### Kapitola 4: Regulace
 
@@ -74,7 +75,7 @@ Z TSTO bereme jen čtyři prvky, které stojí na už existující ekonomice a n
 | Prvek | Jak funguje ve Watt Empire | Proč je levný na výrobu | Fáze |
 | --- | --- | --- | --- |
 | Rostoucí město | Městská čtvrť má vlastní parcely. Každá úroveň prestiže přidá budovu (dům, pekárna, nemocnice, továrna) a každá budova zvedne spotřebu a její špičky. | Prestiž i spotřeba už existují; jde jen o seznam budov a jejich sprity. | MVP |
-| Postavy v úkolech | Starosta a 2 až 3 postavy (technik, vědkyně) zadávají úkoly krátkým dialogem, např. starosta si stěžuje na smog ze spalovny. | Úkoly už v GDD jsou; přidává se jen text a portrét. | MVP |
+| Postavy v úkolech | Starosta a 2 až 3 postavy (technik, vědkyně) zadávají úkoly krátkým dialogem, např. starosta si stěžuje na smog ze spalovny. | Úkoly už v GDD jsou; přidává se jen text a portrét. | MVP | **Hotovo (9. 11.): starosta** zadává žádosti a komentuje průběh v okénku s dialogem (úvod, uklizení, dodávka výkonu, krize, důvěra, občasné hlášky). Další postavy zatím nejsou.
 | Dekorace s bonusem | Parky, stromy a vyčištěné pláže na uvolněných políčkách zvyšují prestiž, a tím výkupní cenu energie. | Využívá mřížku a prestiž; jen nové položky v obchodě. | Fáze 2 |
 | Časové mise | Brigádník se pošle na misi (oprava vedení 30 min, průzkum mlhy 4 h) a vrátí se s odměnou. Hlavní důvod vracet se do hry. | Jeden časovač na postavu; offline výpočet už je potřeba kvůli idle. | Fáze 2 |
 
@@ -180,3 +181,29 @@ Dřívější struktura, ponechaná jako zdroj nápadů:
 - **Původní kapitola 1:** spalovna a start; krize po cca 250 MWh (spalovna vyplivne toxický odpad), úkoly dodej 1 MWh, vyčisti 5 políček, dodej 100 MWh.
 - **Původní kapitola 2: Laboratoř, merge a soláry** (po 500 MWh): výzkum merge minihrou (zkumavky 1+1=2, 2+2=4), likvidátor odpadu (za poplatek trvale ničí toxický odpad), solární panely 1×1 přes střídač (jen ve dne, polední špičky, v noci drží síť spalovna), e-odpad (křemík lze recyklovat na VO).
 - **Původní kapitola 3: Biomy a obnovitelné zdroje:** hory (rozbitá přehrada v mlze, 24/7, drahé vysoké napětí), oceán (offshore vítr, výkon náhodně kolísá, nápor na baterie).
+
+## 10. Stavění na mapě (9. 11. 2026, rozpracované)
+
+### Co autor rozhodl
+
+- **Tvar mapy:** vlevo **pobřeží**, členité (zálivy a mysy, ne jen rovná linie). Na **severu hory**. Vpravo a dole **pevnina**. Tu a tam **keř a skála**, kde se nedá stavět (v budoucnu půjde keře a skály **kácet a odstraňovat**).
+- **Mlha a parcely:** území se odemyká po parcelách, zamlžená část je poloprůhledná. Parcely se začnou kupovat až ve chvíli, kdy bude **co stavět** (nemá smysl dřív).
+- **Pohyb po mapě jako v TSTO:** po odemčeném území se pohybuje volně. Když hráč přejede nad neodemčené (zamlžené) území, mapa se natahuje jako guma (čím dál, tím hůř se táhne) a po puštění se **vrátí zpět ke kraji odemčené části**.
+- **Stavění:** je potřeba vyřešit možnosti stavění (silnice, cesty, dráty, sluneční panely, lesy…), a hlavně **soustavy budov**: například aby fungovala sluneční elektrárna (FVE), musí být **panely propojené dráty, vést do střídače a trafa**. Podobné soustavy budou i jinde.
+- **První budovy na mapě:** **baterie, sklad odpadu a likvidátor**.
+- **Vztah k menu:** dnešní číselná vylepšení (sluneční panely, sklad odpadu, likvidátor, baterie) se **nahradí budovami na mapě**.
+
+### Dořešeno 9. 11. (odpovědi autora)
+
+- **Propojení soustav:** **dotykem po dlaždicích**. Zdroj vyrábí, jen když k němu vede souvislý řetěz dotýkajících se dlaždic až do města.
+- **Cesty (silnice):** slouží **k odvozu odpadu** (sklad a likvidátor musí být cestou napojené na spalovnu) **a také** jako prestiž a dekorace (zvedají cenu energie).
+- **Mapa:** **32×32**, na začátku odemčeno ~12×12 (okolí spalovny a města). Hotovo v kódu: terén, mlha a pohyb jako v TSTO.
+
+### Návrh (k odsouhlasení, části zbývají)
+
+- **Soustava = řetěz, který končí ve městě.** Každá budova a každá dlaždice vodiče je buď zdroj, vodič, přeměna, nebo spotřebitel. Zdroj vyrábí, jen když k němu vede **souvislý řetěz dotýkajících se dlaždic až do města**. Nepřipojené budovy mají na mapě ⚠️.
+- **FVE (kapitola 3):** panely 1×1 (lepí se k sobě) → drát → **střídač** → **trafo** → vedení → město. Výkon = počet připojených panelů × výkon panelu, shora omezený střídačem, ten trafem a to vedením.
+- **Vedení a trafo** přestanou být číslo v menu: stavějí se jako **trafostanice** (kapacita) a **dráty/vedení** (propustnost podle typu).
+- **Odpad (kapitola 2):** **sklad toxického odpadu** a **likvidátor** jsou budovy (2×2) na odemčené pevnině. Kapacita skladu a výkon likvidace jsou součtem postavených budov.
+- **Baterie (kapitola 3):** budova (2×2) připojená dráty do sítě, kapacita je součtem postavených baterií.
+- **Později:** cesty, lesy (důvěra, čistý vzduch), kácení keřů a skal, vítr, hory a přehrada na severu.
