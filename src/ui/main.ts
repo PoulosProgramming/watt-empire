@@ -92,7 +92,9 @@ app.innerHTML = `
       <button class="stat" data-stat="credits"><b id="credits"></b><small id="income"></small></button>
       <button class="stat" data-stat="energy"><b id="energy"></b><small id="power"></small></button>
       <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
+      <button class="stat questbtn" id="questbtn" aria-label="Úkoly">📋<i id="questbang">!</i></button>
     </div>
+    <div id="questpop" hidden></div>
     <div id="clock"></div>
     <div id="modebar"></div>
     <div id="statdetail"></div>
@@ -239,6 +241,32 @@ function announceCrisis(): void {
     seenToxic = true;
     showModal(TOXIC_POPUP_TITLE, TOXIC_POPUP_TEXT);
   }
+}
+
+// Úkoly, které hráč právě vidí v záložce 📋 (hlavní po třech + odemčené průběžné)
+function visibleQuestIds(s: typeof state): string[] {
+  const main = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) === s.chapter && !s.doneQuests.includes(q.id));
+  const leftovers = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) < s.chapter && !s.doneQuests.includes(q.id));
+  const ids = [...main, ...leftovers].slice(0, QUESTS_VISIBLE).map((q) => q.id);
+  if (s.doneQuests.includes(ONGOING_UNLOCK_QUEST)) {
+    const ongoing = QUESTS.filter((q) => q.ongoing && !s.doneQuests.includes(q.id) && (!q.upgrade || isUnlocked(s, q.upgrade)));
+    ids.push(...ongoing.slice(0, ONGOING_QUESTS_VISIBLE).map((q) => q.id));
+  }
+  return ids;
+}
+// Nový úkol: malý popup nahoře u tlačítka 📋
+const knownVisible = new Set<string>(visibleQuestIds(state));
+let questPopTimer = 0;
+function announceNewQuests(): void {
+  const fresh = visibleQuestIds(state).filter((id) => !knownVisible.has(id));
+  if (fresh.length === 0) return;
+  fresh.forEach((id) => knownVisible.add(id));
+  const q = QUESTS.find((x) => x.id === fresh[0])!;
+  const pop = $('questpop');
+  pop.innerHTML = `📋 <b>Nový úkol</b><br>${q.text}${fresh.length > 1 ? `<br><small>…a ${fresh.length - 1} další</small>` : ''}`;
+  pop.hidden = false;
+  clearTimeout(questPopTimer);
+  questPopTimer = window.setTimeout(() => (pop.hidden = true), TOAST_SECONDS * 1000);
 }
 
 function announceQuests(): void {
@@ -397,8 +425,10 @@ const TAB_TITLES: Record<string, string> = {
   debug: '⚙️ Ladění',
 };
 let openTab = '';
+let questsSeenCount = -1; // kolik úkolů bylo hotových, když hráč naposled otevřel úkoly (-1 = ještě nikdy)
 function showTab(name: string): void {
   openTab = name;
+  if (name === 'quests') questsSeenCount = state.doneQuests.length;
   $('sheet').hidden = !name;
   $('sheettitle').textContent = TAB_TITLES[name] ?? '';
   document.querySelectorAll<HTMLElement>('[data-sheet]').forEach((el) => (el.hidden = el.dataset.sheet !== name));
@@ -407,6 +437,11 @@ function showTab(name: string): void {
 document.querySelectorAll<HTMLElement>('.tab').forEach((el) =>
   el.addEventListener('click', () => showTab(openTab === el.dataset.tab ? '' : el.dataset.tab!)),
 );
+$('questpop').addEventListener('click', () => {
+  $('questpop').hidden = true;
+  showTab('quests');
+});
+$('questbtn').addEventListener('click', () => showTab(openTab === 'quests' ? '' : 'quests'));
 $('sheetclose').addEventListener('click', () => showTab(''));
 
 $('toggle').addEventListener('click', () => {
@@ -445,6 +480,7 @@ $('debug').appendChild(resetBtn);
 $('bonus').addEventListener('click', () => (state.credits += DEBUG_CREDITS_BONUS));
 
 function render(): void {
+  $('questbang').style.display = state.doneQuests.length !== questsSeenCount && openTab !== 'quests' ? 'block' : 'none';
   renderBuildMenu();
   renderModebar();
   const s = state;
@@ -664,6 +700,8 @@ createMap($('map'), () => ({
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce
 let last = performance.now();
+let lastRender = 0;
+const RENDER_EVERY_MS = 100; // texty a menu stačí překreslit 10× za sekundu
 let acc = 0;
 function frame(now: number): void {
   acc += Math.min(0.5, (now - last) / 1000) * speed;
@@ -673,10 +711,14 @@ function frame(now: number): void {
     acc -= TICK_DT;
   }
   announceQuests();
+  announceNewQuests();
   announceCrisis();
   announceChapter();
   announceStory();
-  render();
+  if (now - lastRender >= RENDER_EVERY_MS) {
+    lastRender = now;
+    render();
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

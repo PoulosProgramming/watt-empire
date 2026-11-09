@@ -713,6 +713,7 @@ export function createMap(parent: HTMLElement, getView: () => MapView, onCollect
       zoom: 1 / dpr,
     },
     scene: [],
+    fps: { limit: 30 }, // idle hra nepotřebuje 60 snímků, mobil se míň zahřívá a nelaguje
     input: { touch: true, mouse: true },
     callbacks: {
       postBoot: (g) => {

@@ -57,7 +57,7 @@ export const TOXIC_TRIGGER_CHAPTER = 2;
 export const TOXIC_DELAY_SECONDS = 15;
 export const TOXIC_POPUP_TITLE = '☣️ Ekologická katastrofa!';
 export const TOXIC_POPUP_TEXT =
-  'Přetížená spalovna se zadrhla a vyplivla na pláž toxický odpad. Lidé se bouří a město odmítá platit plnou cenu za špinavou energii. Odpad musíš zlikvidovat, nebo aspoň uskladnit, a už ho nevyhazovat na pole. Čím víc ho ležíš na poli, tím míň ti město zaplatí.';
+  'Přetížená spalovna se zadrhla a vyplivla do krajiny toxický odpad. Lidé se bouří a město odmítá platit plnou cenu za špinavou energii. Odpad musíš zlikvidovat, nebo aspoň uskladnit, a už ho nevyhazovat na pole. Čím víc ho ležíš na poli, tím míň ti město zaplatí.';
 export const TOXIC_INITIAL_FIELD = 200; // jednotek toxického odpadu na poli na začátku krize
 export const TOXIC_PER_MWH = 2; // jednotek odpadu na každou MWh vyrobenou spalovnou (po krizi)
 export const TOXIC_FIELD_FULL = 200; // při tolika jednotkách na poli město platí nejméně
@@ -270,8 +270,8 @@ export interface StoryBeat {
 
 export const STORY_BEATS: StoryBeat[] = [
   // --- Kapitola 1: smlouva ---
-  { id: 's_start', trigger: { kind: 'chapter', target: 1 }, text: 'Konečně někdo, kdo se nevzdal! Město je bez proudu a tvoje spalovna je naše jediná naděje. Máme nasmlouvanou stálou dodávku 15 MW. Nejdřív ale potřebuješ palivo: na pláži se válí odpad, klepej na něj a vytřiď ho.' },
-  { id: 's_litter5', trigger: { kind: 'litter', target: 5 }, text: 'Pláž už vypadá o trochu lépe! Prosím, pokračuj. Lidé nesnesou pohled na ten nepořádek a ty z něj uděláš proud.' },
+  { id: 's_start', trigger: { kind: 'chapter', target: 1 }, text: 'Konečně někdo, kdo se nevzdal! Město je bez proudu a tvoje spalovna je naše jediná naděje. Máme nasmlouvanou stálou dodávku 15 MW. Nejdřív ale potřebuješ palivo: po krajině se válí odpad, klepej na něj a vytřiď ho.' },
+  { id: 's_litter5', trigger: { kind: 'litter', target: 5 }, text: 'Krajina už vypadá o trochu lépe! Prosím, pokračuj. Lidé nesnesou pohled na ten nepořádek a ty z něj uděláš proud.' },
   { id: 's_first_mwh', trigger: { kind: 'delivered', target: 1 }, text: 'Svítí! První elektřina dorazila do města. Slyšel jsi ten potlesk? Teď potřebujeme víc výkonu, jinak pomalu zhasneme.' },
   { id: 's_power1', trigger: { kind: 'upgrade', upgrade: 'power', target: 1 }, text: 'Silnější spalovna, skvělé! Sám ale všechno nevyklikáš. Najmi si brigádníky, ať ti s odpadem pomáhají.' },
   { id: 's_worker1', trigger: { kind: 'upgrade', upgrade: 'worker', target: 1 }, text: 'První brigádník! Ať ti pomáhá, ale nezapomeň, že ho musíš platit.' },
@@ -280,12 +280,12 @@ export const STORY_BEATS: StoryBeat[] = [
   { id: 's_line1', trigger: { kind: 'upgrade', upgrade: 'line', target: 1 }, text: 'Nové dráty! Starý rozvod už dlouho nevydržel. Dej pozor, ať výkon neprojde jen do země.' },
   { id: 's_mwh300', trigger: { kind: 'delivered', target: 300 }, text: 'Už svítí většina města. Ale mám divný pocit z toho, co spalovna za sebou nechává. Ostrov není čistý a lidé si toho všímají.' },
   { id: 's_contract', trigger: { kind: 'contract', target: 1 }, text: 'Patnáct megawattů! Splnil jsi smlouvu, o které se říkalo, že je nesplnitelná. Děkuju ti za celý ostrov.' },
-  { id: 's_litter_empty', trigger: { kind: 'litterempty', target: 1 }, text: 'Pláž je čistá jako ze škatulky! Škoda jen, že moře splaví další odpad. Ale děkuju, že ti na tom záleží.' },
+  { id: 's_litter_empty', trigger: { kind: 'litterempty', target: 1 }, text: 'Ostrov je čistý jako ze škatulky! Škoda jen, že moře splaví další odpad. Ale děkuju, že ti na tom záleží.' },
   { id: 's_dirty', trigger: { kind: 'litterpile', target: 45 }, text: 'Ostrov se zase plní odpadem! Moře ho splavuje a sám to nikdy nestihneš vyklikat. Na pravidelný úklid potřebuješ dost brigádníků, aspoň dvanáct. Jen tak zůstane ostrov čistý.' },
   // --- Kapitola 2: odpad a krize ---
-  { id: 's_toxic', trigger: { kind: 'toxic', target: 1 }, text: 'Co se to děje?! Spalovna vyplivla toxický odpad na pláž a lidé se bouří. Město odmítá platit plnou cenu za špinavou energii. Musíš to uklidit, jinak nám přestanou platit úplně!' },
+  { id: 's_toxic', trigger: { kind: 'toxic', target: 1 }, text: 'Co se to děje?! Spalovna vyplivla toxický odpad do krajiny a lidé se bouří. Město odmítá platit plnou cenu za špinavou energii. Musíš to uklidit, jinak nám přestanou platit úplně!' },
   { id: 's_crew_start', trigger: { kind: 'chapter', target: 2 }, text: 'Lidé chtějí čistý ostrov. Zaměstnej úklidovou četu, dvanáct brigádníků, ať ostrov uklízí pravidelně. Ty se starej o spalovnu.' },
-  { id: 's_crew12', trigger: { kind: 'upgrade', upgrade: 'worker', target: 12 }, text: 'Dvanáct lidí na úklid! Hned je na pláži vidět, že se o ni někdo stará. Díky!' },
+  { id: 's_crew12', trigger: { kind: 'upgrade', upgrade: 'worker', target: 12 }, text: 'Dvanáct lidí na úklid! Hned je na ostrově vidět, že se o něj někdo stará. Díky!' },
   { id: 's_cleanup1', trigger: { kind: 'building', building: 'disposer', target: 1 }, text: 'Likvidátor odpadu, konečně se něco děje. Jen ať to nestojí celé město, každá jednotka něco stojí.' },
   { id: 's_storage1', trigger: { kind: 'building', building: 'storage', target: 1 }, text: 'Aspoň část odpadu už neleží na poli. Děti si tam hrávaly. Prosím, ať tam už nic nezůstane.' },
   { id: 's_field_clean', trigger: { kind: 'fieldclean', target: 1 }, text: 'Pole je čisté! Poprvé po dlouhé době se tam dá chodit. Lidé si trochu vydechli.' },
@@ -307,7 +307,7 @@ export const AMBIENT_LINES: Record<number, string[]> = {
     'Slyšel jsem, že v přístavu zase našli bednu odpadu. Nemáš chvilku?',
     'Lidé se ptají, kdy se rozsvítí lampy na náměstí. Já říkám: brzy.',
     'Dnes ráno jsem potkal rybáře. Ryby tu prý ještě jsou, doufám, že ta spalovna nic nepokazí.',
-    'Máš dost odpadu? Kdyby ne, na pláži ho najdeš habaděj.',
+    'Máš dost odpadu? Kdyby ne, po ostrově ho najdeš habaděj po celém ostrově.',
   ],
   2: [
     'Lidé chodí kolem pole s transparenty. Ať už je ten odpad pryč!',
@@ -356,12 +356,12 @@ export const MAP_HEIGHT_PERCENT = 46; // výška mapy v % obrazovky (zbytek je p
 // Po mapě je rozsetý odpad. Každé klepnutí dá VO_PER_TAP vytříděného odpadu, po LITTER_CLICKS klepnutích hromádka zmizí.
 // Nový odpad se objevuje pomalu a přibývá dál, i když hráč nehraje (strop LITTER_MAX). Ze začátku jde odpad stíhat
 // klepáním, později je potřeba úklidová četa z brigádníků.
-export const LITTER_CLICKS = 5; // kolik klepnutí na jednu hromádku
+export const LITTER_CLICKS = 10; // kolik klepnutí na jednu hromádku
 export const LITTER_INITIAL = 36; // kolik hromádek je na mapě na začátku
 export const LITTER_NEAR_COUNT = 14; // z toho blízko spalovny (ať je hned vidět, kam klikat)
 export const LITTER_NEAR_RADIUS_TILES = 6; // co je „blízko“ spalovny
 export const LITTER_MAX = 80; // víc hromádek na mapě naráz nebude
-export const LITTER_RESPAWN_SECONDS = 30; // jak často se objeví nová hromádka (když je místo)
+export const LITTER_RESPAWN_SECONDS = 5; // jak často se objeví nová hromádka (když je místo)
 export const LITTER_DIRTY_COUNT = 45; // od tolika hromádek se ostrov „zaplevelí“ a starosta se ozve
 export const LITTER_CLEAN_COUNT = 5; // „čistý ostrov“ = nanejvýš tolik hromádek
 export const LITTER_CREW_SIZE = 12; // tolik brigádníků udrží ostrov čistý (nový odpad přibývá stejně rychle, jak ho uklízejí)
