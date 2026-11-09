@@ -585,7 +585,6 @@ function render(): void {
       line('Ruční třídění', `${s.taps} klepnutí, ${s.litterCleaned} hromádek`) +
       line('Spálí spalovna', `−${fmt(l.voBurnedPerSecond, 2)}/s`, 'minus') +
       line('Spalovna potřebuje', `${fmt(l.voNeedPerSecond, 2)}/s`) +
-      line('Autonomie', l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : `✖ chybí ${fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2)} VO/s (najmi brigádníka, kup účinnost nebo klikej)`, l.autonomous ? 'plus' : 'minus') +
       line('Celkem (bez tapů)', signed(voNet), 'total') +
       line('Sklad', `${fmt(s.vo, 0)} / ${fmt(voStorageMax(s), 0)} VO`) +
       line('Cena VO navíc (nad sklad)', `${VO_OVERFLOW_PRICE} 💰 / VO`) +
@@ -606,6 +605,9 @@ function render(): void {
     <div class="row"><span>Prestiž města</span><b>${prestige(s)}</b></div>
     <div class="row"><span>Spotřeba města</span><b>${fmt(l.demandMW)} MW</b></div>
     <div class="row"><span>${s.chapter >= 2 ? 'Odběr města (bere, co vedení unese)' : 'Smlouva (stálý odběr)'}</span><b>${s.chapter >= 2 ? fmt(range.max) + ' MW' : fmt(range.max) + ' MW, den i noc'}</b></div>
+    <div class="row"><span>Autonomie</span><b class="${l.autonomous ? 'plus' : 'minus'}">${l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : '✖ chybí ' + fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2) + ' VO/s'}</b></div>
+    <div class="row"><span>VO: brigádníci dodají / spalovna potřebuje</span><b>${fmt(l.voPerSecond, 2)} / ${fmt(l.voNeedPerSecond, 2)} /s</b></div>
+    ${l.autonomous ? '' : '<small>Najmi brigádníka, kup účinnost spalovny, nebo klepej na odpad.</small>'}
     <div class="row"><span>Výroba</span><b>${fmt(l.productionMW)} MW</b></div>
     <div class="row"><span>Dodáváme</span><b>${fmt(l.deliveredMW)} / ${lineCapacityMW(s)} MW (vedení)</b></div>
     <div class="row"><span>Baterie</span><b>${fmt(s.battery)} / ${bcap} MWh ${l.batteryFlowMW > 0.01 ? '⬆' : l.batteryFlowMW < -0.01 ? '⬇' : ''}</b></div>
