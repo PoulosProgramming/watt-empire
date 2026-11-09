@@ -703,7 +703,13 @@ class MapScene extends Phaser.Scene {
 
 export function createMap(parent: HTMLElement, getView: () => MapView, onCollect: CollectFn, onTileTap: TileTapFn): Phaser.Game {
   // Ostrý obraz na displejích s vysokým rozlišením: plátno má fyzické pixely a CSS ho zmenší
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let lowFx = false;
+  try {
+    lowFx = localStorage.getItem('watt-empire-lowfx') === '1';
+  } catch {
+    /* nic */
+  }
+  const dpr = lowFx ? 1 : Math.min(window.devicePixelRatio || 1, 2);
 
   const game = new Phaser.Game({
     type: Phaser.AUTO,
@@ -716,6 +722,7 @@ export function createMap(parent: HTMLElement, getView: () => MapView, onCollect
       zoom: 1 / dpr,
     },
     scene: [],
+    ...(lowFx ? { fps: { limit: 30 } } : {}),
     input: { touch: true, mouse: true },
     callbacks: {
       postBoot: (g) => {

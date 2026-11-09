@@ -530,6 +530,31 @@ resetBtn.addEventListener('click', () => {
   }
 });
 $('debug').appendChild(resetBtn);
+// Výkon: FPS a úsporná grafika (nižší rozlišení mapy a 30 snímků/s) pro slabší telefony
+const LOWFX_KEY = 'watt-empire-lowfx';
+const lowFx = (() => {
+  try {
+    return localStorage.getItem(LOWFX_KEY) === '1';
+  } catch {
+    return false;
+  }
+})();
+const fpsEl = document.createElement('div');
+fpsEl.className = 'row';
+$('debug').appendChild(fpsEl);
+const lowBtn = document.createElement('button');
+lowBtn.textContent = lowFx ? '✔ Úsporná grafika zapnutá (vypnout)' : 'Úsporná grafika (zapnout)';
+lowBtn.addEventListener('click', () => {
+  try {
+    localStorage.setItem(LOWFX_KEY, lowFx ? '0' : '1');
+  } catch {
+    /* nic */
+  }
+  location.reload();
+});
+$('debug').appendChild(lowBtn);
+let fpsFrames = 0;
+let fpsSince = performance.now();
 $('bonus').addEventListener('click', () => (state.credits += DEBUG_CREDITS_BONUS));
 
 function render(): void {
@@ -769,6 +794,12 @@ let lastRender = 0;
 const RENDER_EVERY_MS = 100; // texty a menu stačí překreslit 10× za sekundu
 let acc = 0;
 function frame(now: number): void {
+  fpsFrames++;
+  if (now - fpsSince >= 1000) {
+    fpsEl.innerHTML = `<span>Snímků za sekundu</span><b>${Math.round((fpsFrames * 1000) / (now - fpsSince))} FPS${lowFx ? ' (úsporná grafika)' : ''}</b>`;
+    fpsFrames = 0;
+    fpsSince = now;
+  }
   acc += Math.min(0.5, (now - last) / 1000) * speed;
   last = now;
   while (acc >= TICK_DT) {
