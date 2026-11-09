@@ -181,3 +181,23 @@ Dřívější struktura, ponechaná jako zdroj nápadů:
 - **Původní kapitola 1:** spalovna a start; krize po cca 250 MWh (spalovna vyplivne toxický odpad), úkoly dodej 1 MWh, vyčisti 5 políček, dodej 100 MWh.
 - **Původní kapitola 2: Laboratoř, merge a soláry** (po 500 MWh): výzkum merge minihrou (zkumavky 1+1=2, 2+2=4), likvidátor odpadu (za poplatek trvale ničí toxický odpad), solární panely 1×1 přes střídač (jen ve dne, polední špičky, v noci drží síť spalovna), e-odpad (křemík lze recyklovat na VO).
 - **Původní kapitola 3: Biomy a obnovitelné zdroje:** hory (rozbitá přehrada v mlze, 24/7, drahé vysoké napětí), oceán (offshore vítr, výkon náhodně kolísá, nápor na baterie).
+
+## 10. Stavění na mapě (9. 11. 2026, rozpracované)
+
+### Co autor rozhodl
+
+- **Tvar mapy:** vlevo **pobřeží**, členité (zálivy a mysy, ne jen rovná linie). Na **severu hory**. Vpravo a dole **pevnina**. Tu a tam **keř a skála**, kde se nedá stavět (v budoucnu půjde keře a skály **kácet a odstraňovat**).
+- **Mlha a parcely:** území se odemyká po parcelách, zamlžená část je poloprůhledná. Parcely se začnou kupovat až ve chvíli, kdy bude **co stavět** (nemá smysl dřív).
+- **Pohyb po mapě jako v TSTO:** po odemčeném území se pohybuje volně. Když hráč přejede nad neodemčené (zamlžené) území, mapa se natahuje jako guma (čím dál, tím hůř se táhne) a po puštění se **vrátí zpět ke kraji odemčené části**.
+- **Stavění:** je potřeba vyřešit možnosti stavění (silnice, cesty, dráty, sluneční panely, lesy…), a hlavně **soustavy budov**: například aby fungovala sluneční elektrárna (FVE), musí být **panely propojené dráty, vést do střídače a trafa**. Podobné soustavy budou i jinde.
+- **První budovy na mapě:** **baterie, sklad odpadu a likvidátor**.
+- **Vztah k menu:** dnešní číselná vylepšení (sluneční panely, sklad odpadu, likvidátor, baterie) se **nahradí budovami na mapě**.
+
+### Návrh (k odsouhlasení, zatím nic z toho není v kódu)
+
+- **Soustava = řetěz, který končí ve městě.** Každá budova a každá dlaždice vodiče je buď zdroj, vodič, přeměna, nebo spotřebitel. Zdroj vyrábí, jen když k němu vede **souvislý řetěz dotýkajících se dlaždic až do města**. Nepřipojené budovy mají na mapě ⚠️.
+- **FVE (kapitola 3):** panely 1×1 (lepí se k sobě) → drát → **střídač** → **trafo** → vedení → město. Výkon = počet připojených panelů × výkon panelu, shora omezený střídačem, ten trafem a to vedením.
+- **Vedení a trafo** přestanou být číslo v menu: stavějí se jako **trafostanice** (kapacita) a **dráty/vedení** (propustnost podle typu).
+- **Odpad (kapitola 2):** **sklad toxického odpadu** a **likvidátor** jsou budovy (2×2) na odemčené pevnině. Kapacita skladu a výkon likvidace jsou součtem postavených budov.
+- **Baterie (kapitola 3):** budova (2×2) připojená dráty do sítě, kapacita je součtem postavených baterií.
+- **Později:** cesty, lesy (důvěra, čistý vzduch), kácení keřů a skal, vítr, hory a přehrada na severu.
