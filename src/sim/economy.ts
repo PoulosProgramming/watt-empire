@@ -2,12 +2,10 @@ import {
   EFFICIENCY_VO_FACTOR,
   INCINERATOR_BASE_MW,
   INCINERATOR_POWER_STEP_MW,
-  INCINERATOR_VO_PER_MWH,
-  SECONDS_PER_GAME_HOUR,
   UPGRADES,
   VO_OVERFLOW_PRICE,
   VO_PER_TAP,
-  VO_STORAGE_SECONDS,
+  VO_STORAGE_MAX,
   WORKER_VO_PER_SECOND,
   WORKER_WAGE_PER_SECOND,
   type UpgradeId,
@@ -29,9 +27,8 @@ export function upgradeCost(id: UpgradeId, level: number): number {
 export const incineratorNominalMW = (s: GameState) =>
   INCINERATOR_BASE_MW + s.upgrades.power * INCINERATOR_POWER_STEP_MW;
 
-// Kolik VO se vejde do skladu spalovny (strop = VO_STORAGE_SECONDS sekund provozu při plném výkonu)
-export const voStorageMax = (s: GameState) =>
-  (incineratorNominalMW(s) / SECONDS_PER_GAME_HOUR) * INCINERATOR_VO_PER_MWH * VO_STORAGE_SECONDS;
+// Kolik VO se vejde do skladu spalovny (pevné číslo)
+export const voStorageMax = (_s: GameState) => VO_STORAGE_MAX;
 
 // Přidá VO do skladu; co se nevejde, se automaticky prodá za kredity.
 export function addVO(s: GameState, amount: number): void {

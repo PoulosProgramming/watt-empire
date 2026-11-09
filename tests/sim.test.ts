@@ -405,11 +405,11 @@ describe('sklad VO', () => {
     expect(s.credits).toBeCloseTo(2 * VO_OVERFLOW_PRICE, 5);
   });
 
-  it('strop roste s výkonem spalovny', () => {
+  it('strop je pevný a nezávisí na výkonu spalovny', () => {
     const s = newGame();
     const low = voStorageMax(s);
     s.upgrades.power = 3;
-    expect(voStorageMax(s)).toBeGreaterThan(low);
+    expect(voStorageMax(s)).toBe(low);
   });
 
   it('tap do plného skladu přidá kredity místo VO', () => {
