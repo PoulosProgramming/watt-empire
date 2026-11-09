@@ -1,6 +1,7 @@
 import {
   CHAPTER_END_QUESTS,
   MAX_CHAPTER,
+  ONGOING_UNLOCK_QUEST,
   QUESTS,
   TOXIC_DELAY_SECONDS,
   TOXIC_INITIAL_FIELD,
@@ -18,6 +19,7 @@ export function requirementProgress(s: GameState, r: Requirement): number {
   if (r.kind === 'disposed') return s.toxicDisposed;
   if (r.kind === 'fieldclean') return s.toxic && s.toxicDisposed > 0 && s.toxicField < 0.5 ? 1 : 0;
   if (r.kind === 'trust') return s.trust;
+  if (r.kind === 'litter') return s.litterCleaned;
   if (r.kind === 'upgrade') return r.upgrade ? s.upgrades[r.upgrade] : 0;
   return s.delivered;
 }
@@ -28,6 +30,7 @@ export const questProgress = (s: GameState, q: QuestDef): number => requirementP
 export function checkQuests(s: GameState): void {
   for (const q of QUESTS) {
     if ((q.chapter ?? 1) > s.chapter) continue; // úkol z pozdější kapitoly se ještě nespustil
+    if (q.ongoing && !s.doneQuests.includes(ONGOING_UNLOCK_QUEST)) continue; // průběžné úkoly se počítají až po odemknutí (po autonomii)
     if (!s.doneQuests.includes(q.id) && questProgress(s, q) >= q.target) {
       s.doneQuests.push(q.id);
       s.credits += q.reward;

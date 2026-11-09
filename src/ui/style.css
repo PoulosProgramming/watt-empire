@@ -8,7 +8,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0f172a; col
 #hud > * { pointer-events: auto; }
 #statdetail:empty, #alerts:empty { display: none; }
 #statdetail .detail { max-height: 50dvh; overflow-y: auto; background: rgba(30, 41, 59, .96); }
-.tap { position: absolute; left: 12px; bottom: 16px; z-index: 5; width: auto; min-height: 56px; padding: 0 20px; font-size: 17px; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
 #tabs { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 8; }
 .tab { width: 50px; height: 50px; min-height: 50px; padding: 0; font-size: 26px; line-height: 1; background: rgba(30, 41, 59, .94); border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
 .tab.active { border-color: #60a5fa; background: #1e3a5f; }
@@ -28,7 +27,6 @@ h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: #
 button { min-height: 48px; min-width: 44px; border: 0; border-radius: 10px; font-size: 16px; font-weight: 600; background: #2563eb; color: #fff; padding: 8px 14px; }
 button:disabled { background: #334155; color: #64748b; }
 button:active:not(:disabled) { transform: scale(.97); }
-.tap { background: #16a34a; }
 .up { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; margin-bottom: 6px; background: #334155; }
 .up:disabled { opacity: .6; }
 .up small { display: block; font-weight: 400; color: #cbd5e1; }

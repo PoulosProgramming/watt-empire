@@ -1,13 +1,17 @@
 import Phaser from 'phaser';
 import {
+  LITTER_CLICKS,
+  MAP_CITY_TILE,
+  MAP_DRAG_THRESHOLD_PX,
   MAP_GRID_SIZE,
   MAP_INCINERATOR_TILE,
-  MAP_CITY_TILE,
+  MAP_SOLAR_TILE,
   MAP_TILE_PX,
+  MAP_WASTE_SPOTS,
   MAP_ZOOM_MAX,
   MAP_ZOOM_START,
-  MAP_DRAG_THRESHOLD_PX,
 } from '../sim/balance';
+import { wireTiles } from '../sim/mapdata';
 
 // Co mapa potřebuje vědět o hře (jen čtení, simulace zůstává bez grafiky)
 export interface MapView {
@@ -30,20 +34,16 @@ export interface MapView {
   solarLevel: number; // úroveň sluneční elektrárny (0 = nemáme)
   solarMW: number; // výkon panelů právě teď
   solarCapMW: number; // nejvyšší výkon panelů
+  litter: { x: number; y: number; left: number }[]; // odpad rozsetý po mapě
 }
 
-// Místa kolem spalovny, kde se objevují hromady toxického odpadu (dlaždice)
-const WASTE_SPOTS = [
-  { x: 7, y: 8 },
-  { x: 7, y: 11 },
-  { x: 12, y: 8 },
-  { x: 8, y: 12 },
-  { x: 11, y: 12 },
-  { x: 6, y: 10 },
-  { x: 12, y: 11 },
-  { x: 10, y: 7 },
-];
-const SOLAR_TILE = { x: 3, y: 13 }; // sluneční panely vlevo dole (4×2 dlaždice)
+// Výsledek klepnutí na odpad (null = nic tam nebylo)
+export type CollectFn = (x: number, y: number) => { removed: boolean; left: number } | null;
+
+const LITTER_ICONS = ['🥤', '📦', '🗑️', '🍾', '🛢️', '🥫'];
+
+const WASTE_SPOTS = MAP_WASTE_SPOTS;
+const SOLAR_TILE = MAP_SOLAR_TILE;
 
 const T = MAP_TILE_PX;
 const N = MAP_GRID_SIZE;
@@ -75,6 +75,11 @@ class MapScene extends Phaser.Scene {
   private solarObjs: Phaser.GameObjects.GameObject[] = [];
   private solarLabel!: Phaser.GameObjects.Text;
   private wire!: Phaser.GameObjects.Graphics;
+  private onCollect!: CollectFn;
+  private litterObjs = new Map<string, { box: Phaser.GameObjects.Container; icon: Phaser.GameObjects.Text }>();
+  private litterSynced = false; // první vykreslení bez „vyskakování“
+  private lastLitter: { x: number; y: number; left: number }[] = [];
+  private pinchedAt = 0;
   private dragging = false;
   private pinching = false;
   private pinchLast = 0;
@@ -84,8 +89,9 @@ class MapScene extends Phaser.Scene {
     super('map');
   }
 
-  init(data: { getView: () => MapView; nightEl: HTMLElement; dpr: number }): void {
+  init(data: { getView: () => MapView; onCollect: CollectFn; nightEl: HTMLElement; dpr: number }): void {
     this.getView = data.getView;
+    this.onCollect = data.onCollect;
     this.nightEl = data.nightEl;
     this.dpr = data.dpr;
   }
@@ -110,8 +116,16 @@ class MapScene extends Phaser.Scene {
 
     this.setupInput();
 
-    // Ladicí háček pro testy v prohlížeči (jen čtení zoomu)
-    (window as unknown as { __wattMap?: { zoom: () => number } }).__wattMap = { zoom: () => cam.zoom };
+    // Ladicí háček pro testy v prohlížeči (jen čtení)
+    (window as unknown as { __wattMap?: unknown }).__wattMap = {
+      zoom: () => cam.zoom,
+      litter: () => this.lastLitter,
+      // střed dlaždice na obrazovce (CSS pixely vůči plátnu), pro ruční testy
+      tileScreen: (x: number, y: number) => ({
+        x: (((x + 0.5) * T - cam.worldView.x) * cam.zoom) / this.dpr,
+        y: (((y + 0.5) * T - cam.worldView.y) * cam.zoom) / this.dpr,
+      }),
+    };
   }
 
   // Nejmenší zoom = celý ostrov se právě vejde (i s trochou vody kolem), dál oddálit nejde
@@ -130,18 +144,6 @@ class MapScene extends Phaser.Scene {
         g.fillRect(x * T, y * T, T, T);
       }
     }
-  }
-
-  // Dráty vedou od spalovny doprava a pak dolů k městu
-  private wireTiles(): { x: number; y: number }[] {
-    const a = MAP_INCINERATOR_TILE;
-    const c = MAP_CITY_TILE;
-    const tiles: { x: number; y: number }[] = [];
-    const y0 = a.y + 1;
-    const cx = c.x + 1;
-    for (let x = a.x + 2; x <= cx; x++) tiles.push({ x, y: y0 });
-    for (let y = y0 + 1; y < c.y; y++) tiles.push({ x: cx, y });
-    return tiles;
   }
 
   // Ostré emoji i při velkém přiblížení: textura s vysokým rozlišením
@@ -235,6 +237,7 @@ class MapScene extends Phaser.Scene {
         if (this.pinchLast > 0 && d > 0) cam.setZoom(Phaser.Math.Clamp(cam.zoom * (d / this.pinchLast), this.minZoom, maxZoom));
         this.pinchLast = d;
         this.pinching = true;
+        this.pinchedAt = performance.now();
       },
       { passive: false },
     );
@@ -258,10 +261,124 @@ class MapScene extends Phaser.Scene {
       cam.scrollX -= (p.x - p.prevPosition.x) / cam.zoom;
       cam.scrollY -= (p.y - p.prevPosition.y) / cam.zoom;
     });
+    // Klepnutí (ne tažení, ne přiblížení) na odpad: vytřídí 1 VO, po LITTER_CLICKS klepnutích hromádka zmizí
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      this.pinchLast = 0;
+      if (this.dragging || this.pinching || performance.now() - this.pinchedAt < 350) return;
+      this.tapAt(p);
+    });
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => {
       const factor = dy > 0 ? 0.9 : 1.1;
       cam.setZoom(Phaser.Math.Clamp(cam.zoom * factor, this.minZoom, maxZoom));
     });
+  }
+
+  // Najde nejbližší hromádku odpadu u prstu (štědrý dosah, prst je nepřesný) a zkusí ji vytřídit
+  private tapAt(p: Phaser.Input.Pointer): void {
+    const cam = this.cameras.main;
+    const w = cam.getWorldPoint(p.x, p.y);
+    let best: { x: number; y: number; left: number } | null = null;
+    let bestD = T * 0.9;
+    for (const l of this.lastLitter) {
+      const d = Phaser.Math.Distance.Between(w.x, w.y, (l.x + 0.5) * T, (l.y + 0.5) * T);
+      if (d < bestD) {
+        bestD = d;
+        best = l;
+      }
+    }
+    if (!best) return;
+    const cx = (best.x + 0.5) * T;
+    const cy = (best.y + 0.5) * T;
+    const key = `${best.x},${best.y}`;
+    const res = this.onCollect(best.x, best.y);
+    if (!res) return;
+    this.collectEffects(cx, cy, key, res.removed);
+  }
+
+  // Efekty při klepnutí: zatřesení, +1 VO nahoru, jiskry; při zmizení hromádky větší výbuch a krátká vibrace telefonu
+  private collectEffects(x: number, y: number, key: string, removed: boolean): void {
+    const px = this.dpr / this.cameras.main.zoom; // kolik světových pixelů je jeden CSS pixel
+    const obj = this.litterObjs.get(key);
+    if (obj && !removed) {
+      this.tweens.add({ targets: obj.box, scale: { from: 1.3, to: 1 }, angle: { from: -10, to: 0 }, duration: 160, ease: 'Back.Out' });
+    }
+    this.floatText(x, y - 10 * px, '+1 ♻️', '#bbf7d0', 16);
+    this.burst(x, y, 0x86efac, removed ? 14 : 6, px);
+    if (removed) {
+      this.floatText(x, y - 34 * px, '✨ uklizeno!', '#fde68a', 15);
+      this.burst(x, y, 0xfde68a, 10, px);
+    }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(removed ? 25 : 8);
+  }
+
+  private floatText(x: number, y: number, text: string, color: string, sizeCss: number): void {
+    const px = this.dpr / this.cameras.main.zoom;
+    const tx = this.add
+      .text(x, y, text, {
+        fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        fontSize: `${sizeCss}px`,
+        fontStyle: 'bold',
+        color,
+        stroke: '#052e16',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setResolution(this.dpr * 2)
+      .setScale(px)
+      .setDepth(30);
+    this.tweens.add({ targets: tx, y: y - 42 * px, alpha: 0, duration: 700, ease: 'Cubic.Out', onComplete: () => tx.destroy() });
+  }
+
+  private burst(x: number, y: number, color: number, count: number, px: number): void {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = (22 + Math.random() * 30) * px;
+      const dot = this.add.circle(x, y, (2.5 + Math.random() * 2) * px, color).setDepth(29);
+      this.tweens.add({
+        targets: dot,
+        x: x + Math.cos(a) * d,
+        y: y + Math.sin(a) * d,
+        alpha: 0,
+        scale: 0.2,
+        duration: 380 + Math.random() * 200,
+        ease: 'Cubic.Out',
+        onComplete: () => dot.destroy(),
+      });
+    }
+  }
+
+  // Hromádky odpadu na mapě podle stavu hry: nové se objeví (s „vyskočením“), uklizené zmizí
+  private syncLitter(litter: { x: number; y: number; left: number }[]): void {
+    this.lastLitter = litter;
+    const seen = new Set<string>();
+    for (const l of litter) {
+      const key = `${l.x},${l.y}`;
+      seen.add(key);
+      let obj = this.litterObjs.get(key);
+      if (!obj) {
+        const bg = this.add.circle(0, 0, T * 0.5, 0x000000, 0.28);
+        const icon = this.add
+          .text(0, 0, LITTER_ICONS[(l.x * 7 + l.y * 3) % LITTER_ICONS.length], {
+            fontFamily: 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif',
+            fontSize: `${T * 0.85}px`,
+          })
+          .setOrigin(0.5)
+          .setResolution(Math.min(8, MAP_ZOOM_MAX * this.dpr));
+        const box = this.add.container((l.x + 0.5) * T, (l.y + 0.5) * T, [bg, icon]).setDepth(5);
+        obj = { box, icon };
+        this.litterObjs.set(key, obj);
+        if (this.litterSynced) this.tweens.add({ targets: box, scale: { from: 0, to: 1 }, duration: 260, ease: 'Back.Out' });
+      }
+      // čím míň klepnutí zbývá, tím je hromádka menší
+      obj.icon.setScale(0.6 + 0.4 * (l.left / LITTER_CLICKS));
+    }
+    for (const [key, obj] of this.litterObjs) {
+      if (!seen.has(key)) {
+        obj.box.destroy();
+        this.litterObjs.delete(key);
+      }
+    }
+    this.litterSynced = true;
   }
 
   update(): void {
@@ -271,6 +388,8 @@ class MapScene extends Phaser.Scene {
     const factor = Phaser.Math.Clamp(cam.zoom / this.dpr, 0.5, 1);
     const labelScale = (this.dpr / cam.zoom) * factor;
     this.wireLabel.setVisible(factor >= 0.75);
+
+    this.syncLitter(v.litter);
 
     // Noc: tmavý závoj (HTML vrstva nad mapou, jen vizuálně)
     this.nightEl.style.opacity = v.isNight ? '1' : '0';
@@ -309,7 +428,7 @@ class MapScene extends Phaser.Scene {
     // Dráty: svítí podle toho, kolik energie teče, s popiskem propustnosti
     const flow = v.demandMW > 0 ? Math.min(1, v.deliveredMW / v.demandMW) : 0;
     this.wire.clear();
-    for (const t of this.wireTiles()) {
+    for (const t of wireTiles()) {
       this.wire.fillStyle(flow > 0.01 ? COLORS.wire : COLORS.wireDim, 0.35 + 0.65 * flow);
       this.wire.fillRect(t.x * T + T * 0.35, t.y * T + T * 0.35, T * 0.3, T * 0.3);
     }
@@ -321,7 +440,7 @@ class MapScene extends Phaser.Scene {
   }
 }
 
-export function createMap(parent: HTMLElement, getView: () => MapView): Phaser.Game {
+export function createMap(parent: HTMLElement, getView: () => MapView, onCollect: CollectFn): Phaser.Game {
   // Ostrý obraz na displejích s vysokým rozlišením: plátno má fyzické pixely a CSS ho zmenší
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const nightEl = document.createElement('div');
@@ -342,7 +461,7 @@ export function createMap(parent: HTMLElement, getView: () => MapView): Phaser.G
     input: { touch: true, mouse: true },
     callbacks: {
       postBoot: (g) => {
-        g.scene.add('map', MapScene, true, { getView, nightEl, dpr });
+        g.scene.add('map', MapScene, true, { getView, onCollect, nightEl, dpr });
       },
     },
   });

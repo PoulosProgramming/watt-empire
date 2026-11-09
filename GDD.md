@@ -38,7 +38,7 @@ Hra má **pět kapitol**, každou odemyká splnění cíle předchozí. Vše je 
 Hráč je spalovna, která zásobuje ostrov. Má **nasmlouvanou dodávku 15 MW, kterou musí městu dávat stabilně, bez ohledu na den a noc**. To je hlavní bod kapitoly: začít vyrábět stabilně a dodat městu smluvních 15 MW.
 
 - **Mapa:** mřížka cca 20×20, viditelná jen malá část, odpadky na zemi. Uprostřed spalovna (2×2), dráty vedou do trafa města v pravém dolním rohu.
-- **Ekonomika:** 5 tapů na odpad = 5 vytříděného odpadu (VO). 5 VO ve spalovně = 1 MWh. 1 MWh dodaná městu = 10 kreditů. Spalovna začíná na 3 MW, výkon se zvyšuje nákupem (až na 15 MW).
+- **Ekonomika:** odpad je rozsetý po mapě, klepnutí na hromádku = 1 vytříděný odpad (VO), po 5 klepnutích hromádka zmizí (nový odpad se objevuje pomalu). 5 VO ve spalovně = 1 MWh. 1 MWh dodaná městu = 10 kreditů. Spalovna začíná na 3 MW, výkon se zvyšuje nákupem (až na 15 MW).
 - **Vylepšení:** brigádníci (automatický sběr, max 6), výkon a účinnost spalovny, kapacita drátů a trafa (nutná pro výkon nad 6 MW).
 - **Bez regulace:** čím víc hráč vyrábí, tím víc město odebírá (až do smluvních 15 MW). Regulátor, baterie ani mařič v kapitole 1 nejsou.
 - **Úkoly místo tutoriálu**, hlavní úkoly odemykají technologie a dávají bonusy; průběžné úkoly (po autonomii) dávají peníze za další vylepšování.

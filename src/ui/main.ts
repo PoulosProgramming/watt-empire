@@ -29,11 +29,12 @@ import {
   UPGRADES,
 } from '../sim/balance';
 import { isDay } from '../sim/daynight';
-import { buyUpgrade, clampVO, isUnlocked, tap, upgradeCost, voPerMWh, voStorageMax } from '../sim/economy';
+import { buyUpgrade, clampVO, isUnlocked, upgradeCost, voPerMWh, voStorageMax } from '../sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../sim/game';
 import { batteryCapacityMWh, cityDemandRangeMW, disposeRate, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige, solarCapacityMW, storageCapacity } from '../sim/power';
 import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
+import { collectLitter } from '../sim/litter';
 import { createMap } from './map';
 import { newGame } from '../sim/state';
 
@@ -85,7 +86,6 @@ app.innerHTML = `
     <div id="statdetail"></div>
     <div id="alerts"></div>
   </div>
-  <button class="tap" id="tap">♻️ Třídit odpad (+1 VO)</button>
 
   <nav id="tabs">
     <button class="tab" data-tab="furnace" aria-label="Spalovna">🏭</button>
@@ -127,9 +127,9 @@ app.innerHTML = `
         <div id="ending"></div>
         <div class="card help">
           <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
-          <p>Začni klepáním na odpad, pak najmi brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
+          <p><b>Klepej na odpad na mapě</b> (🥤 📦 🗑️): každé klepnutí vytřídí 1 ♻️ VO a po 5 klepnutích hromádka zmizí. Nový odpad se objevuje pomalu, takže potřebuješ i brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
           <p>Máš <b>smlouvu na stálých 15 MW</b>, den i noc. Za kredity zvyšuj <b>výkon</b> spalovny a vedení (dráty a trafo), ať městu dodáš celých 15 MW. Pozor: vedení musí unést tvůj výkon, jinak se síť přetíží a přijde ⚫ blackout.</p>
-          <p>Mapu posuneš tažením prstu a přiblížíš dvěma prsty. Záložky vpravo otevírají menu: 🏭 spalovna, 🛠️ vylepšení, 📋 úkoly, 🔌 síť, 📖 nápověda, ⚙️ ladění.</p>
+          <p>Mapu posuneš tažením prstu a přiblížíš dvěma prsty; klepnutím na odpad ho vytřídíš. Záložky vpravo otevírají menu: 🏭 spalovna, 🛠️ vylepšení, 📋 úkoly, 🔌 síť, 📖 nápověda, ⚙️ ladění.</p>
         </div>
       </div>
       <div data-sheet="debug" hidden>
@@ -245,7 +245,6 @@ document.querySelectorAll<HTMLElement>('.tab').forEach((el) =>
 );
 $('sheetclose').addEventListener('click', () => showTab(''));
 
-$('tap').addEventListener('click', () => tap(state));
 $('toggle').addEventListener('click', () => {
   state.incineratorOn = !state.incineratorOn;
 });
@@ -327,7 +326,7 @@ function render(): void {
     const voNet = l.voPerSecond - l.voBurnedPerSecond;
     detail =
       line('Brigádníci', `+${fmt(l.voPerSecond, 2)}/s`, 'plus') +
-      line('Ruční třídění', `${s.taps} tapů celkem`) +
+      line('Ruční třídění', `${s.taps} klepnutí, ${s.litterCleaned} hromádek`) +
       line('Spálí spalovna', `−${fmt(l.voBurnedPerSecond, 2)}/s`, 'minus') +
       line('Spalovna potřebuje', `${fmt(l.voNeedPerSecond, 2)}/s`) +
       line('Autonomie', l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : `✖ chybí ${fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2)} VO/s (najmi brigádníka, kup účinnost nebo klikej)`, l.autonomous ? 'plus' : 'minus') +
@@ -473,7 +472,8 @@ createMap($('map'), () => ({
   solarLevel: state.upgrades.solar,
   solarMW: state.live.solarMW,
   solarCapMW: solarCapacityMW(state),
-}));
+  litter: state.litter,
+}), (x, y) => collectLitter(state, x, y));
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce
 let last = performance.now();

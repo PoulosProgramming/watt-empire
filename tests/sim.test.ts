@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CHAPTER_END_QUESTS, CONTRACT_MW, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
+import { CHAPTER_END_QUESTS, CONTRACT_MW, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { solarMW } from '../src/sim/power';
 import { runCrisis } from '../src/sim/quests';
+import { collectLitter, initLitter, runLitter, spawnLitter } from '../src/sim/litter';
+import { isBlockedTile } from '../src/sim/mapdata';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
 import { newGame } from '../src/sim/state';
@@ -515,11 +517,11 @@ describe('brigádníci', () => {
 });
 
 describe('pořadí úkolů', () => {
-  it('line2 je 15. hlavní úkol a účinnost má v hlavním řetězci tři úkoly před ním', () => {
+  it('účinnost má v hlavním řetězci tři úkoly před úkolem line2', () => {
     const main = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) === 1);
-    expect(main[14].id).toBe('line2');
-    const beforeTrigger = main.slice(0, 14).filter((q) => q.upgrade === 'efficiency').length;
-    expect(beforeTrigger).toBe(3);
+    const idx = main.findIndex((q) => q.id === 'line2');
+    expect(idx).toBeGreaterThan(0);
+    expect(main.slice(0, idx).filter((q) => q.upgrade === 'efficiency').length).toBe(3);
   });
 
   it('mařič a baterie už nejsou v hlavním řetězci kapitoly 1', () => {
@@ -729,5 +731,109 @@ describe('kapitola 3: čistý zdroj a důvěra', () => {
       if (s.blackout > 0) blackout = true;
     }
     expect(blackout).toBe(true);
+  });
+});
+
+describe('odpad na mapě', () => {
+  it('na začátku je na mapě odpad, část blízko spalovny, nic na budovách, drátech ani na vodě', () => {
+    const s = newGame();
+    expect(s.litter.length).toBe(LITTER_INITIAL);
+    for (const l of s.litter) {
+      expect(isBlockedTile(l.x, l.y)).toBe(false);
+      expect(l.left).toBe(LITTER_CLICKS);
+    }
+    const a = MAP_INCINERATOR_TILE;
+    const near = s.litter.filter((l) => Math.abs(l.x - (a.x + 1)) <= LITTER_NEAR_RADIUS_TILES && Math.abs(l.y - (a.y + 1)) <= LITTER_NEAR_RADIUS_TILES);
+    expect(near.length).toBeGreaterThanOrEqual(LITTER_NEAR_COUNT);
+    // žádné dvě hromádky na stejné dlaždici
+    expect(new Set(s.litter.map((l) => `${l.x},${l.y}`)).size).toBe(s.litter.length);
+  });
+
+  it('klepnutí dá 1 VO a po 5 klepnutích hromádka zmizí a započítá se jako uklizená', () => {
+    const s = newGame();
+    const { x, y } = s.litter[0];
+    const n = s.litter.length;
+    for (let i = 1; i < LITTER_CLICKS; i++) {
+      const r = collectLitter(s, x, y)!;
+      expect(r.removed).toBe(false);
+      expect(r.left).toBe(LITTER_CLICKS - i);
+    }
+    expect(s.vo).toBe(LITTER_CLICKS - 1);
+    expect(s.litterCleaned).toBe(0);
+    const last = collectLitter(s, x, y)!;
+    expect(last.removed).toBe(true);
+    expect(s.vo).toBe(LITTER_CLICKS);
+    expect(s.taps).toBe(LITTER_CLICKS);
+    expect(s.litterCleaned).toBe(1);
+    expect(s.litter.length).toBe(n - 1);
+    expect(collectLitter(s, x, y)).toBeNull(); // už tam nic není
+  });
+
+  it('nový odpad se objevuje pomalu a nepřekročí strop', () => {
+    const s = newGame();
+    s.litter.splice(0, 10);
+    const n = s.litter.length;
+    runLitter(s, LITTER_RESPAWN_SECONDS * 3);
+    expect(s.litter.length).toBe(n + 3);
+    runLitter(s, 10000);
+    expect(s.litter.length).toBeLessThanOrEqual(LITTER_MAX);
+    expect(s.litter.length).toBe(LITTER_MAX);
+  });
+
+  it('rozmístění je deterministické a po spawnu nikdy nevznikne dvakrát stejná dlaždice', () => {
+    const a = newGame();
+    const b = newGame();
+    expect(a.litter).toEqual(b.litter);
+    for (let i = 0; i < 20; i++) spawnLitter(a);
+    expect(new Set(a.litter.map((l) => `${l.x},${l.y}`)).size).toBe(a.litter.length);
+    initLitter(b);
+    expect(b.litter).toEqual(newGame().litter);
+  });
+
+  it('vytříděný odpad jde do skladu VO a když je plný, přebytek se prodá', () => {
+    const s = newGame();
+    s.vo = 59.5; // sklad 60 VO
+    const { x, y } = s.litter[0];
+    collectLitter(s, x, y);
+    expect(s.vo).toBeCloseTo(60, 5);
+    expect(s.credits).toBeGreaterThan(0);
+  });
+
+  it('úkol "uklid 5 hromádek" se splní a odměna se vyplatí', () => {
+    const s = newGame();
+    s.litterCleaned = 5;
+    tick(s);
+    expect(s.doneQuests).toContain('litter5');
+  });
+
+  it('odpad se uloží a načte (včetně už uklizeného)', () => {
+    const s = newGame();
+    const { x, y } = s.litter[0];
+    for (let i = 0; i < LITTER_CLICKS; i++) collectLitter(s, x, y);
+    const back = deserialize(serialize(s))!;
+    expect(back.litter).toEqual(s.litter);
+    expect(back.litterCleaned).toBe(1);
+    // starší uložení bez odpadu dostane čerstvý odpad na mapě
+    const old = deserialize(JSON.stringify({ v: 1, state: { credits: 5 } }))!;
+    expect(old.litter.length).toBe(LITTER_INITIAL);
+  });
+
+  it('průběžné úkoly na uklízení se nezapočítají před odemknutím (autonomie), jinak by se přeskočila hra', () => {
+    const s = newGame();
+    s.litterCleaned = 120;
+    tick(s);
+    expect(s.doneQuests).not.toContain('o_litter100');
+    s.doneQuests.push('autonomy');
+    tick(s);
+    expect(s.doneQuests).toContain('o_litter100');
+    expect(s.credits).toBeGreaterThanOrEqual(600);
+  });
+
+  it('při dopočtu času pryč (idle) odpad dál přibývá', () => {
+    const s = newGame();
+    s.litter.splice(0, 20);
+    const n = s.litter.length;
+    simulateOffline(s, 120);
+    expect(s.litter.length).toBeGreaterThan(n);
   });
 });

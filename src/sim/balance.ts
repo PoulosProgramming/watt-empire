@@ -80,9 +80,9 @@ export const PRESTIGE_THRESHOLDS_MWH = [0, 500, 1200, 2800, 6500];
 // ---- Vylepšení ----
 export type UpgradeId = 'worker' | 'power' | 'efficiency' | 'line' | 'battery' | 'dump' | 'regulator' | 'cleanup' | 'storage' | 'solar';
 
-// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu) | smlouva (dosažení smluvních MW) | kapitola
+// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu) | smlouva (dosažení smluvních MW) | kapitola | uklizený odpad na mapě
 export interface Requirement {
-  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter' | 'disposed' | 'fieldclean' | 'trust';
+  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter' | 'disposed' | 'fieldclean' | 'trust' | 'litter';
   target: number;
   upgrade?: UpgradeId; // jen pro kind 'upgrade'
 }
@@ -129,7 +129,8 @@ export const ONGOING_QUESTS_VISIBLE = 2; // kolik průběžných úkolů se zobr
 export const QUESTS: QuestDef[] = [
   // --- Hlavní řetězec (kapitola 1): úkoly jdou v pořadí, jak je hráč potřebuje ---
   { id: 'deliver1', text: 'Dodej městu 1 MWh', kind: 'delivered', target: 1, reward: 20 },
-  { id: 'tap25', text: 'Vyčisti 25 odpadků (ruční tapy)', kind: 'taps', target: 25, reward: 30 },
+  { id: 'tap25', text: 'Klepej na odpad na mapě: vytřiď 25× (po 5 klepnutích hromádka zmizí)', kind: 'taps', target: 25, reward: 30 },
+  { id: 'litter5', text: 'Uklid 5 hromádek odpadu na mapě', kind: 'litter', target: 5, reward: 50 },
   { id: 'power1', text: 'Zvyš výkon spalovny na úroveň 1 (4 MW, odemkne brigádníky)', kind: 'upgrade', upgrade: 'power', target: 1, reward: 150 },
   { id: 'worker3', text: 'Najmi 3 brigádníky', kind: 'upgrade', upgrade: 'worker', target: 3, reward: 80 },
   { id: 'power2', text: 'Zvyš výkon spalovny na úroveň 2 (5 MW)', kind: 'upgrade', upgrade: 'power', target: 2, reward: 300 },
@@ -167,6 +168,9 @@ export const QUESTS: QuestDef[] = [
   { id: 'c3_trust60', chapter: 3, text: 'Důvěra veřejnosti na 60 %', kind: 'trust', target: 60, reward: 10000 },
   { id: 'c3_trust100', chapter: 3, text: 'Přesvědč veřejnost, že jsme čistý zdroj: důvěra na 100 % (konec kapitoly 3)', kind: 'trust', target: 100, reward: 20000 },
   // --- Průběžné úkoly (nepovinné, ukážou se po autonomii) ---
+  { id: 'o_litter100', ongoing: true, text: 'Uklid 100 hromádek odpadu na mapě', kind: 'litter', target: 100, reward: 600 },
+  { id: 'o_litter300', ongoing: true, text: 'Uklid 300 hromádek odpadu na mapě', kind: 'litter', target: 300, reward: 2500 },
+  { id: 'o_litter600', ongoing: true, text: 'Uklid 600 hromádek odpadu na mapě', kind: 'litter', target: 600, reward: 6000 },
   { id: 'o_eff4', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 4 (plný výkon 10 MW na 6 brigádníků)', kind: 'upgrade', upgrade: 'efficiency', target: 4, reward: 2500 },
   { id: 'o_worker6', ongoing: true, text: 'Najmi 6 brigádníků', kind: 'upgrade', upgrade: 'worker', target: 6, reward: 600 },
   { id: 'o_eff5', ongoing: true, text: 'Vylepši účinnost spalovny na úroveň 5', kind: 'upgrade', upgrade: 'efficiency', target: 5, reward: 3500 },
@@ -208,10 +212,33 @@ export const MAP_GRID_SIZE = 20; // mřížka 20×20 dlaždic
 export const MAP_TILE_PX = 32; // velikost dlaždice ve světových pixelech
 export const MAP_INCINERATOR_TILE = { x: 9, y: 9 }; // levý horní roh spalovny (2×2) uprostřed
 export const MAP_CITY_TILE = { x: 16, y: 16 }; // levý horní roh města (3×3) vpravo dole
+export const MAP_SOLAR_TILE = { x: 3, y: 13 }; // sluneční panely vlevo dole (4×2 dlaždice)
+// Místa kolem spalovny, kde se objevují hromady toxického odpadu (dlaždice)
+export const MAP_WASTE_SPOTS = [
+  { x: 7, y: 8 },
+  { x: 7, y: 11 },
+  { x: 12, y: 8 },
+  { x: 8, y: 12 },
+  { x: 11, y: 12 },
+  { x: 6, y: 10 },
+  { x: 12, y: 11 },
+  { x: 10, y: 7 },
+];
 export const MAP_ZOOM_START = 1.1; // počáteční přiblížení (viditelná je jen část mapy)
 export const MAP_ZOOM_MAX = 2.5;
 export const MAP_DRAG_THRESHOLD_PX = 8; // posun mapy až po pohybu prstu o tolik pixelů
 export const MAP_HEIGHT_PERCENT = 46; // výška mapy v % obrazovky (zbytek je panel)
+
+// ---- Odpad na mapě (ruční třídění) ----
+// Po mapě je rozsetý odpad. Každé klepnutí dá VO_PER_TAP vytříděného odpadu, po LITTER_CLICKS klepnutích hromádka zmizí.
+// Nový odpad se objevuje pomalu, takže nejde donekonečna klikat (hráč potřebuje brigádníky).
+export const LITTER_CLICKS = 5; // kolik klepnutí na jednu hromádku
+export const LITTER_INITIAL = 36; // kolik hromádek je na mapě na začátku
+export const LITTER_NEAR_COUNT = 14; // z toho blízko spalovny (ať je hned vidět, kam klikat)
+export const LITTER_NEAR_RADIUS_TILES = 6; // co je „blízko“ spalovny
+export const LITTER_MAX = 40; // víc hromádek na mapě naráz nebude
+export const LITTER_RESPAWN_SECONDS = 4; // jak často se objeví nová hromádka (když je místo)
+export const LITTER_SEED = 20261109; // semínko pro náhodné rozmístění (stejné rozmístění v testech)
 
 // ---- Oznámení ----
 export const TOAST_SECONDS = 7; // jak dlouho je vidět oznámení o splněném úkolu

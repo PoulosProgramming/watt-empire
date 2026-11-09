@@ -1,4 +1,12 @@
 import { START_HOUR, type UpgradeId } from './balance';
+import { initLitter } from './litter';
+
+// Hromádka odpadu na mapě: dlaždice a kolik klepnutí zbývá, než zmizí
+export interface Litter {
+  x: number;
+  y: number;
+  left: number;
+}
 
 // Všechno, co se ukládá, je v jednom objektu.
 export interface GameState {
@@ -20,6 +28,10 @@ export interface GameState {
   contractMet: boolean; // splněna smlouva (město aspoň jednou dostalo smluvních MW)
   toxic: boolean; // ekologická krize začala (toxický odpad)
   toxicCountdown: number; // sekundy do spuštění krize (-1 = odpočet neběží)
+  litter: Litter[]; // odpad rozsetý po mapě (ruční třídění klepáním)
+  litterSeed: number; // stav generátoru náhodných čísel pro nový odpad
+  litterTimer: number; // sekundy do dalšího nového odpadu
+  litterCleaned: number; // kolik hromádek odpadu se celkem uklidilo
   toxicField: number; // toxický odpad na poli (snižuje cenu energie)
   toxicStored: number; // toxický odpad bezpečně ve skladu
   toxicDisposed: number; // kolik jednotek odpadu se celkem zlikvidovalo
@@ -52,7 +64,7 @@ export interface GameState {
 }
 
 export function newGame(): GameState {
-  return {
+  const s: GameState = {
     credits: 0,
     vo: 0,
     hour: START_HOUR,
@@ -71,6 +83,10 @@ export function newGame(): GameState {
     contractMet: false,
     toxic: false,
     toxicCountdown: -1,
+    litter: [],
+    litterSeed: 0,
+    litterTimer: 0,
+    litterCleaned: 0,
     toxicField: 0,
     toxicStored: 0,
     toxicDisposed: 0,
@@ -100,4 +116,6 @@ export function newGame(): GameState {
       priceFactor: 1,
     },
   };
+  initLitter(s);
+  return s;
 }
