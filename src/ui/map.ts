@@ -111,6 +111,7 @@ class MapScene extends Phaser.Scene {
   private hintKey = '';
   private ghostGfx!: Phaser.GameObjects.Graphics;
   private parcelLabels: Phaser.GameObjects.Text[] = [];
+  private selected: 'incinerator' | 'city' | 'wire' | 'solar' | null = null; // popisek se ukáže až po klepnutí na budovu
   private hover: { x: number; y: number } | null = null;
   private onTileTap!: TileTapFn;
   private buildObjs = new Map<string, { box: Phaser.GameObjects.Container; warn: Phaser.GameObjects.Text | null; w: number }>();
@@ -391,13 +392,27 @@ class MapScene extends Phaser.Scene {
         best = l;
       }
     }
-    if (!best) return;
+    if (!best) {
+      this.selected = this.structureAt(Math.floor(w.x / T), Math.floor(w.y / T));
+      return;
+    }
+    this.selected = null;
     const cx = (best.x + 0.5) * T;
     const cy = (best.y + 0.5) * T;
     const key = `${best.x},${best.y}`;
     const res = this.onCollect(best.x, best.y);
     if (!res) return;
     this.collectEffects(cx, cy, key, res.removed);
+  }
+
+  // Která velká budova je na dané dlaždici (pro zobrazení popisku)
+  private structureAt(x: number, y: number): 'incinerator' | 'city' | 'wire' | 'solar' | null {
+    const inR = (rx: number, ry: number, w: number, h: number) => x >= rx && x < rx + w && y >= ry && y < ry + h;
+    if (inR(MAP_INCINERATOR_TILE.x, MAP_INCINERATOR_TILE.y, 2, 2)) return 'incinerator';
+    if (inR(MAP_CITY_TILE.x, MAP_CITY_TILE.y, 3, 3)) return 'city';
+    if (inR(SOLAR_TILE.x, SOLAR_TILE.y, 4, 2)) return 'solar';
+    if (wireTiles().some((q) => q.x === x && q.y === y)) return 'wire';
+    return null;
   }
 
   // Efekty při klepnutí: zatřesení, +1 VO nahoru, jiskry; při zmizení hromádky větší výbuch a krátká vibrace telefonu
@@ -621,7 +636,10 @@ class MapScene extends Phaser.Scene {
     // Popisky mají stálou velikost na obrazovce, při velkém oddálení se zmenší (ať se nepřekrývají)
     const factor = Phaser.Math.Clamp(cam.zoom / this.dpr, 0.5, 1);
     const labelScale = (this.dpr / cam.zoom) * factor;
-    this.wireLabel.setVisible(factor >= 0.75);
+    if (v.mode !== 'none') this.selected = null;
+    this.wireLabel.setVisible(this.selected === 'wire');
+    this.incineratorLabel.setVisible(this.selected === 'incinerator');
+    this.cityLabel.setVisible(this.selected === 'city');
 
     this.syncLitter(v.litter);
     this.syncBuildings(v.buildings);
@@ -657,7 +675,7 @@ class MapScene extends Phaser.Scene {
     const hasSolar = v.solarLevel > 0;
     this.solarObjs.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Visible).setVisible(hasSolar));
     this.solarLabel
-      .setVisible(hasSolar && factor >= 0.75)
+      .setVisible(hasSolar && this.selected === 'solar')
       .setText(`Sluneční panely\n☀️ ${v.solarMW.toFixed(1)} / ${v.solarCapMW} MW`)
       .setScale(labelScale)
       .setPosition((SOLAR_TILE.x + 2) * T, SOLAR_TILE.y * T - 4);
