@@ -14,7 +14,7 @@ export const START_HOUR = 8;
 export const VO_PER_TAP = 1; // 5 tapů na odpad = 5 VO (GDD)
 export const WORKER_VO_PER_SECOND = 0.4; // 5 brigádníků = 2 VO/s = přesně na 6 MW
 // Sklad VO u spalovny má strop = tolik sekund provozu při plném výkonu. Přebytek se automaticky prodá.
-export const VO_STORAGE_SECONDS = 60;
+export const VO_STORAGE_MAX = 60; // strop skladu VO je pevný (dřív rostl s výkonem spalovny, hráči to nedávalo smysl)
 export const VO_OVERFLOW_PRICE = 0.3; // kredity za 1 prodaný VO navíc
 export const WORKER_WAGE_PER_SECOND = 0.2; // mzda v kreditech za sekundu
 
@@ -203,7 +203,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'c2_storage', chapter: 2, text: 'Přestaň vyhazovat odpad na pole: postav sklad toxického odpadu', kind: 'building', building: 'storage', target: 1, reward: 1500 },
   { id: 'c2_dispose300', chapter: 2, text: 'Zlikviduj 300 jednotek toxického odpadu', kind: 'disposed', target: 300, reward: 2500 },
   { id: 'c2_field', chapter: 2, text: 'Vyčisti pole: ať na poli nezůstane žádný toxický odpad', kind: 'fieldclean', target: 1, reward: 3000 },
-  { id: 'c2_crew', chapter: 2, text: 'Zaměstnej úklidovou četu: 12 brigádníků na pravidelný úklid ostrova', kind: 'upgrade', upgrade: 'worker', target: 12, reward: 5000 },
+  { id: 'c2_crew', chapter: 2, text: 'Zaměstnej úklidovou četu: 10 brigádníků na pravidelný úklid ostrova', kind: 'upgrade', upgrade: 'worker', target: 10, reward: 5000 },
   { id: 'c2_island', chapter: 2, text: 'Udrž ostrov čistý: na mapě nanejvýš 5 hromádek odpadu', kind: 'litterlow', target: 1, reward: 3000 },
   { id: 'c2_cleanup3', chapter: 2, text: 'Posil likvidaci: postav 3 likvidátory odpadu', kind: 'building', building: 'disposer', target: 3, reward: 3500 },
   { id: 'c2_power14', chapter: 2, text: 'Zvyš výkon spalovny na úroveň 14 (17 MW): čím víc vyrábíš, tím víc město odebírá', kind: 'upgrade', upgrade: 'power', target: 14, reward: 4000 },
@@ -282,11 +282,11 @@ export const STORY_BEATS: StoryBeat[] = [
   { id: 's_mwh300', trigger: { kind: 'delivered', target: 300 }, text: 'Už svítí většina města. Ale mám divný pocit z toho, co spalovna za sebou nechává. Ostrov není čistý a lidé si toho všímají.' },
   { id: 's_contract', trigger: { kind: 'contract', target: 1 }, text: 'Patnáct megawattů! Splnil jsi smlouvu, o které se říkalo, že je nesplnitelná. Děkuju ti za celý ostrov.' },
   { id: 's_litter_empty', trigger: { kind: 'litterempty', target: 1 }, text: 'Ostrov je čistý jako ze škatulky! Škoda jen, že moře splaví další odpad. Ale děkuju, že ti na tom záleží.' },
-  { id: 's_dirty', trigger: { kind: 'litterpile', target: 45 }, text: 'Ostrov se zase plní odpadem! Moře ho splavuje a sám to nikdy nestihneš vyklikat. Na pravidelný úklid potřebuješ dost brigádníků, aspoň dvanáct. Jen tak zůstane ostrov čistý.' },
+  { id: 's_dirty', trigger: { kind: 'litterpile', target: 45 }, text: 'Ostrov se zase plní odpadem! Moře ho splavuje a sám to nikdy nestihneš vyklikat. Na pravidelný úklid potřebuješ dost brigádníků, aspoň deset. Jen tak zůstane ostrov čistý.' },
   // --- Kapitola 2: odpad a krize ---
   { id: 's_toxic', trigger: { kind: 'toxic', target: 1 }, text: 'Co se to děje?! Spalovna vyplivla toxický odpad do krajiny a lidé se bouří. Město odmítá platit plnou cenu za špinavou energii. Musíš to uklidit, jinak nám přestanou platit úplně!' },
-  { id: 's_crew_start', trigger: { kind: 'chapter', target: 2 }, text: 'Lidé chtějí čistý ostrov. Zaměstnej úklidovou četu, dvanáct brigádníků, ať ostrov uklízí pravidelně. Ty se starej o spalovnu.' },
-  { id: 's_crew12', trigger: { kind: 'upgrade', upgrade: 'worker', target: 12 }, text: 'Dvanáct lidí na úklid! Hned je na ostrově vidět, že se o něj někdo stará. Díky!' },
+  { id: 's_crew_start', trigger: { kind: 'chapter', target: 2 }, text: 'Lidé chtějí čistý ostrov. Zaměstnej úklidovou četu, deset brigádníků, ať ostrov uklízí pravidelně. Ty se starej o spalovnu.' },
+  { id: 's_crew10', trigger: { kind: 'upgrade', upgrade: 'worker', target: 10 }, text: 'Deset lidí na úklid! Hned je na ostrově vidět, že se o něj někdo stará. Díky!' },
   { id: 's_cleanup1', trigger: { kind: 'building', building: 'disposer', target: 1 }, text: 'Likvidátor odpadu, konečně se něco děje. Jen ať to nestojí celé město, každá jednotka něco stojí.' },
   { id: 's_storage1', trigger: { kind: 'building', building: 'storage', target: 1 }, text: 'Aspoň část odpadu už neleží na poli. Děti si tam hrávaly. Prosím, ať tam už nic nezůstane.' },
   { id: 's_field_clean', trigger: { kind: 'fieldclean', target: 1 }, text: 'Pole je čisté! Poprvé po dlouhé době se tam dá chodit. Lidé si trochu vydechli.' },
@@ -357,7 +357,7 @@ export const MAP_HEIGHT_PERCENT = 46; // výška mapy v % obrazovky (zbytek je p
 // Po mapě je rozsetý odpad. Každé klepnutí dá VO_PER_TAP vytříděného odpadu, po LITTER_CLICKS klepnutích hromádka zmizí.
 // Nový odpad se objevuje pomalu a přibývá dál, i když hráč nehraje (strop LITTER_MAX). Ze začátku jde odpad stíhat
 // klepáním, později je potřeba úklidová četa z brigádníků.
-export const LITTER_CLICKS = 10; // kolik klepnutí na jednu hromádku
+export const LITTER_CLICKS = 5; // kolik klepnutí na jednu hromádku
 export const LITTER_INITIAL = 36; // kolik hromádek je na mapě na začátku
 export const LITTER_NEAR_COUNT = 14; // z toho blízko spalovny (ať je hned vidět, kam klikat)
 export const LITTER_NEAR_RADIUS_TILES = 6; // co je „blízko“ spalovny
@@ -365,7 +365,7 @@ export const LITTER_MAX = 80; // víc hromádek na mapě naráz nebude
 export const LITTER_RESPAWN_SECONDS = 5; // jak často se objeví nová hromádka (když je místo)
 export const LITTER_DIRTY_COUNT = 45; // od tolika hromádek se ostrov „zaplevelí“ a starosta se ozve
 export const LITTER_CLEAN_COUNT = 5; // „čistý ostrov“ = nanejvýš tolik hromádek
-export const LITTER_CREW_SIZE = 12; // tolik brigádníků udrží ostrov čistý (nový odpad přibývá stejně rychle, jak ho uklízejí)
+export const LITTER_CREW_SIZE = 10; // tolik brigádníků udrží ostrov čistý (nový odpad přibývá stejně rychle, jak ho uklízejí)
 // Každý brigádník uklidí jednu hromádku za tuto dobu; četa LITTER_CREW_SIZE brigádníků tak zvládne právě tolik, kolik odpadu přibývá
 export const LITTER_WORKER_CLEAN_SECONDS = LITTER_CREW_SIZE * LITTER_RESPAWN_SECONDS;
 export const LITTER_SEED = 20261109; // semínko pro náhodné rozmístění (stejné rozmístění v testech)

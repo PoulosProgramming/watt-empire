@@ -114,6 +114,6 @@ small { color: #94a3b8; }
 @keyframes tutglow { 50% { box-shadow: 0 0 0 4px #38bdf8, 0 0 18px 6px #38bdf8; } }
 
 .map-glow { position: absolute; left: 0; top: 0; border-radius: 50%; opacity: 0; transition: opacity 1.5s; pointer-events: none; will-change: transform; }
-.map-glow.furnace { background: radial-gradient(circle, rgba(255, 150, 50, .75) 0%, rgba(255, 120, 30, .35) 40%, rgba(255, 100, 20, 0) 70%); }
+.map-glow.furnace { background: radial-gradient(circle, rgba(255, 170, 70, .8) 0%, rgba(255, 130, 40, .45) 45%, rgba(255, 110, 30, 0) 72%); }
 .map-glow.city { background: radial-gradient(circle, rgba(255, 225, 120, .7) 0%, rgba(255, 210, 100, .32) 40%, rgba(255, 200, 80, 0) 70%); }
 #grid b.plus { color: #4ade80; } #grid b.minus { color: #f87171; }

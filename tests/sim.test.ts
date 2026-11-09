@@ -405,11 +405,11 @@ describe('sklad VO', () => {
     expect(s.credits).toBeCloseTo(2 * VO_OVERFLOW_PRICE, 5);
   });
 
-  it('strop roste s výkonem spalovny', () => {
+  it('strop je pevný a nezávisí na výkonu spalovny', () => {
     const s = newGame();
     const low = voStorageMax(s);
     s.upgrades.power = 3;
-    expect(voStorageMax(s)).toBeGreaterThan(low);
+    expect(voStorageMax(s)).toBe(low);
   });
 
   it('tap do plného skladu přidá kredity místo VO', () => {
@@ -1008,10 +1008,10 @@ describe('úklidová četa a přibývání odpadu', () => {
     expect(s.story).toContain('s_crew_start');
     s.upgrades.worker = 12;
     checkStory(s);
-    expect(s.story).toContain('s_crew12');
+    expect(s.story).toContain('s_crew10');
   });
 
-  it('úkoly kapitoly 2: četa 12 brigádníků a čistý ostrov', () => {
+  it('úkoly kapitoly 2: četa 10 brigádníků a čistý ostrov', () => {
     const s = newGame();
     s.chapter = 2;
     s.upgrades.worker = 12;
