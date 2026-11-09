@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
+import { LITTER_CLEAN_COUNT, LITTER_CREW_SIZE, LITTER_DIRTY_COUNT, AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { solarMW } from '../src/sim/power';
@@ -923,5 +923,77 @@ describe('starosta (děj)', () => {
     checkStory(s);
     const back = deserialize(serialize(s))!;
     expect(back.story).toEqual(s.story);
+  });
+});
+
+describe('úklidová četa a přibývání odpadu', () => {
+  const crew = (workers: number) => {
+    const s = newGame();
+    s.doneQuests = QUESTS.filter((q) => !CHAPTER_END_QUESTS[1].includes(q.id)).map((q) => q.id);
+    s.upgrades.worker = workers;
+    s.credits = 1e9; // ať brigádníci nestojí
+    s.incineratorOn = false;
+    return s;
+  };
+
+  it('bez brigádníků odpad dál přibývá až na strop (i při dopočtu času pryč)', () => {
+    const s = crew(0);
+    simulateOffline(s, 86400);
+    expect(s.litter.length).toBe(LITTER_MAX);
+  });
+
+  it('četa o počtu LITTER_CREW_SIZE odpad udrží, víc brigádníků ostrov vyčistí', () => {
+    const hold = crew(LITTER_CREW_SIZE);
+    const n0 = hold.litter.length;
+    run(hold, 3000);
+    expect(Math.abs(hold.litter.length - n0)).toBeLessThanOrEqual(3);
+    const clean = crew(LITTER_CREW_SIZE * 2);
+    run(clean, 3000);
+    expect(clean.litter.length).toBeLessThanOrEqual(LITTER_CLEAN_COUNT);
+    const few = crew(3);
+    run(few, 3000);
+    expect(few.litter.length).toBeGreaterThan(n0); // 3 brigádníci nestačí, odpad přibývá
+  });
+
+  it('brigádníci bez peněz na mzdy neuklízejí', () => {
+    const s = crew(20);
+    s.credits = 0;
+    const n0 = s.litter.length;
+    run(s, 600);
+    expect(s.litter.length).toBeGreaterThanOrEqual(n0);
+  });
+
+  it('úklid četou se nezapočítává mezi hráčem uklizené hromádky', () => {
+    const s = crew(LITTER_CREW_SIZE * 2);
+    run(s, 3000);
+    expect(s.litterCleaned).toBe(0);
+  });
+
+  it('starosta upozorní, když se ostrov zaplevelí, a v kapitole 2 žádá četu', () => {
+    const s = newGame();
+    checkStory(s);
+    expect(s.story).not.toContain('s_dirty');
+    while (s.litter.length < LITTER_DIRTY_COUNT) spawnLitter(s);
+    checkStory(s);
+    expect(s.story).toContain('s_dirty');
+    s.chapter = 2;
+    checkStory(s);
+    expect(s.story).toContain('s_crew_start');
+    s.upgrades.worker = 12;
+    checkStory(s);
+    expect(s.story).toContain('s_crew12');
+  });
+
+  it('úkoly kapitoly 2: četa 12 brigádníků a čistý ostrov', () => {
+    const s = newGame();
+    s.chapter = 2;
+    s.upgrades.worker = 12;
+    tick(s);
+    expect(s.doneQuests).toContain('c2_crew');
+    expect(s.doneQuests).not.toContain('c2_island'); // odpad na mapě ještě je
+    s.litter.length = 0;
+    s.litter.push({ x: 4, y: 4, left: 5 });
+    tick(s);
+    expect(s.doneQuests).toContain('c2_island');
   });
 });

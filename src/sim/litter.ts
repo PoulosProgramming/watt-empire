@@ -6,6 +6,7 @@ import {
   LITTER_NEAR_RADIUS_TILES,
   LITTER_RESPAWN_SECONDS,
   LITTER_SEED,
+  LITTER_WORKER_CLEAN_SECONDS,
   MAP_GRID_SIZE,
   MAP_INCINERATOR_TILE,
   VO_PER_TAP,
@@ -52,8 +53,24 @@ export function initLitter(s: GameState): void {
   for (let i = 0; i < LITTER_INITIAL; i++) spawnLitter(s, i < LITTER_NEAR_COUNT);
 }
 
+// Brigádníci pravidelně uklízejí ostrov: každý uklidí hromádku za LITTER_WORKER_CLEAN_SECONDS (zadarmo, VO dávají jinak).
+// Když stojí (nejsou peníze na mzdy), neuklízejí. Uklizená hromádka se nezapočítává do hráčova uklizeného odpadu.
+function runCrew(s: GameState, dt: number): void {
+  const workers = s.upgrades.worker;
+  if (workers === 0 || s.live.workersPaused || s.litter.length === 0) {
+    s.litterCrewAcc = 0;
+    return;
+  }
+  s.litterCrewAcc += (workers * dt) / LITTER_WORKER_CLEAN_SECONDS;
+  while (s.litterCrewAcc >= 1 && s.litter.length > 0) {
+    s.litterCrewAcc -= 1;
+    s.litter.splice(Math.floor(nextRandom(s) * s.litter.length), 1);
+  }
+}
+
 // Nový odpad se objevuje pomalu, dokud je na mapě místo (strop LITTER_MAX)
 export function runLitter(s: GameState, dt: number): void {
+  runCrew(s, dt);
   if (s.litter.length >= LITTER_MAX) {
     s.litterTimer = 0;
     return;

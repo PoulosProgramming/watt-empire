@@ -1,5 +1,6 @@
 import {
   CHAPTER_END_QUESTS,
+  LITTER_CLEAN_COUNT,
   MAX_CHAPTER,
   ONGOING_UNLOCK_QUEST,
   QUESTS,
@@ -21,6 +22,8 @@ export function requirementProgress(s: GameState, r: Requirement): number {
   if (r.kind === 'trust') return s.trust;
   if (r.kind === 'litter') return s.litterCleaned;
   if (r.kind === 'toxic') return s.toxic ? 1 : 0;
+  if (r.kind === 'litterpile') return s.litter.length;
+  if (r.kind === 'litterlow') return s.litter.length <= LITTER_CLEAN_COUNT ? 1 : 0;
   if (r.kind === 'litterempty') return s.litterCleaned > 0 && s.litter.length === 0 ? 1 : 0;
   if (r.kind === 'upgrade') return r.upgrade ? s.upgrades[r.upgrade] : 0;
   return s.delivered;

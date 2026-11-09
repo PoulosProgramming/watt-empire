@@ -33,6 +33,7 @@ export interface GameState {
   litter: Litter[]; // odpad rozsetý po mapě (ruční třídění klepáním)
   litterSeed: number; // stav generátoru náhodných čísel pro nový odpad
   litterTimer: number; // sekundy do dalšího nového odpadu
+  litterCrewAcc: number; // rozpracovaný úklid brigádníků (hromádky, které se právě uklízejí)
   litterCleaned: number; // kolik hromádek odpadu se celkem uklidilo
   toxicField: number; // toxický odpad na poli (snižuje cenu energie)
   toxicStored: number; // toxický odpad bezpečně ve skladu
@@ -90,6 +91,7 @@ export function newGame(): GameState {
     litter: [],
     litterSeed: 0,
     litterTimer: 0,
+    litterCrewAcc: 0,
     litterCleaned: 0,
     toxicField: 0,
     toxicStored: 0,

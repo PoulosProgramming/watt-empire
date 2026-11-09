@@ -374,8 +374,9 @@ class MapScene extends Phaser.Scene {
     }
     for (const [key, obj] of this.litterObjs) {
       if (!seen.has(key)) {
-        obj.box.destroy();
+        // zmizela (vyklepaná, nebo ji uklidila četa brigádníků): krátké zmenšení
         this.litterObjs.delete(key);
+        this.tweens.add({ targets: obj.box, scale: 0, alpha: 0, duration: 180, ease: 'Cubic.In', onComplete: () => obj.box.destroy() });
       }
     }
     this.litterSynced = true;
