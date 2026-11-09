@@ -12,7 +12,7 @@ import {
   VO_PER_TAP,
 } from './balance';
 import { addVO } from './economy';
-import { isBlockedTile } from './mapdata';
+import { isLitterTile } from './mapdata';
 import type { GameState, Litter } from './state';
 
 // Malý deterministický generátor náhodných čísel (stav se ukládá ve hře, v testech je výsledek vždy stejný)
@@ -39,7 +39,7 @@ export function spawnLitter(s: GameState, near = false): boolean {
       x = Math.floor(nextRandom(s) * MAP_GRID_SIZE);
       y = Math.floor(nextRandom(s) * MAP_GRID_SIZE);
     }
-    if (isBlockedTile(x, y) || has(s, x, y)) continue;
+    if (!isLitterTile(s.unlockedParcels, x, y) || has(s, x, y)) continue;
     s.litter.push({ x, y, left: LITTER_CLICKS });
     return true;
   }

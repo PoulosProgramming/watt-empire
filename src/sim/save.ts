@@ -1,4 +1,5 @@
 import { TOXIC_TRIGGER_CHAPTER } from './balance';
+import { isLitterTile } from './mapdata';
 import { newGame, type GameState } from './state';
 
 // Ukládání jako text (JSON). Čistý TypeScript: o samotné úložiště (localStorage) se stará UI.
@@ -29,6 +30,8 @@ export function deserialize(text: string | null): GameState | null {
       loaded.toxic = false;
       loaded.toxicCountdown = -1;
     }
+    // Mapa se zvětšila a dostala terén: odpad na dlaždicích, kde už ležet nesmí, se zahodí (nový se dosype sám)
+    loaded.litter = loaded.litter.filter((l) => isLitterTile(loaded.unlockedParcels, l.x, l.y));
     return loaded;
   } catch {
     return null;

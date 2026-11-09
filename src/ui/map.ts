@@ -3,15 +3,20 @@ import {
   LITTER_CLICKS,
   MAP_CITY_TILE,
   MAP_DRAG_THRESHOLD_PX,
+  MAP_FOG_ALPHA,
   MAP_GRID_SIZE,
   MAP_INCINERATOR_TILE,
+  MAP_RUBBER_SPRING,
+  MAP_RUBBER_STRETCH_TILES,
   MAP_SOLAR_TILE,
   MAP_TILE_PX,
   MAP_WASTE_SPOTS,
   MAP_ZOOM_MAX,
   MAP_ZOOM_START,
+  PARCEL_SIZE,
+  PARCELS_PER_SIDE,
 } from '../sim/balance';
-import { wireTiles } from '../sim/mapdata';
+import { obstacleAt, parcelOrigin, terrainAt, unlockedBounds, wireTiles } from '../sim/mapdata';
 
 // Co mapa potřebuje vědět o hře (jen čtení, simulace zůstává bez grafiky)
 export interface MapView {
@@ -35,6 +40,7 @@ export interface MapView {
   solarMW: number; // výkon panelů právě teď
   solarCapMW: number; // nejvyšší výkon panelů
   litter: { x: number; y: number; left: number }[]; // odpad rozsetý po mapě
+  unlocked: number[]; // odemčené parcely (zbytek je v mlze)
 }
 
 // Výsledek klepnutí na odpad (null = nic tam nebylo)
@@ -55,6 +61,10 @@ const COLORS = {
   landA: 0x6b7d4f,
   landB: 0x62744a,
   shore: 0xb5a06a,
+  mountainA: 0x6f665b,
+  mountainB: 0x5f574d,
+  peak: 0xe5e7eb,
+  fog: 0x0b1220,
   incinerator: 0xd9531e,
   incineratorIdle: 0x7a2e12,
   incineratorOff: 0x555a60,
@@ -84,6 +94,13 @@ class MapScene extends Phaser.Scene {
   private pinching = false;
   private pinchLast = 0;
   private minZoom = 0.5;
+  // Kamera: skutečný střed, kam hráč táhne (může být i za okrajem odemčeného území), a gumové natažení
+  private cx = 0;
+  private cy = 0;
+  private held = false; // prst nebo myš je dole
+  private fog!: Phaser.GameObjects.Graphics;
+  private fogKey = '';
+  private bounds = { x0: 0, y0: 0, x1: MAP_GRID_SIZE, y1: MAP_GRID_SIZE };
 
   constructor() {
     super('map');
@@ -97,17 +114,18 @@ class MapScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.drawGround();
+    this.drawTerrain();
     this.wire = this.add.graphics();
     this.drawBuildings();
+    this.fog = this.add.graphics().setDepth(8);
 
     const cam = this.cameras.main;
-    const pad = WORLD * 0.5; // kolem ostrova je jen voda, ať jde oddálit a vidět celý ostrov
-    cam.setBounds(-pad, -pad, WORLD + 2 * pad, WORLD + 2 * pad);
     this.applyMinZoom();
     cam.setZoom(Math.max(this.minZoom, MAP_ZOOM_START * this.dpr));
     const a = MAP_INCINERATOR_TILE;
-    cam.centerOn((a.x + 1) * T, (a.y + 1) * T);
+    this.cx = (a.x + 1) * T;
+    this.cy = (a.y + 1) * T;
+    cam.centerOn(this.cx, this.cy);
 
     this.scale.on('resize', () => {
       this.applyMinZoom();
@@ -120,6 +138,7 @@ class MapScene extends Phaser.Scene {
     (window as unknown as { __wattMap?: unknown }).__wattMap = {
       zoom: () => cam.zoom,
       litter: () => this.lastLitter,
+      center: () => ({ x: this.cx / T, y: this.cy / T, shownX: (cam.scrollX + cam.width / 2) / T, shownY: (cam.scrollY + cam.height / 2) / T }),
       // střed dlaždice na obrazovce (CSS pixely vůči plátnu), pro ruční testy
       tileScreen: (x: number, y: number) => ({
         x: (((x + 0.5) * T - cam.worldView.x) * cam.zoom) / this.dpr,
@@ -130,19 +149,74 @@ class MapScene extends Phaser.Scene {
 
   // Nejmenší zoom = celý ostrov se právě vejde (i s trochou vody kolem), dál oddálit nejde
   private applyMinZoom(): void {
-    this.minZoom = Math.max(Math.min(this.scale.width, this.scale.height) / (WORLD * 1.1), 0.1);
+    this.minZoom = Math.max(Math.min(this.scale.width, this.scale.height) / (WORLD * 1.05), 0.1);
   }
 
-  private drawGround(): void {
+  // Terén: pobřeží vlevo (voda a pláž), hory na severu, pevnina, keře a skály
+  private drawTerrain(): void {
     const g = this.add.graphics();
+    const emojiFont = 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
     for (let y = 0; y < N; y++) {
       for (let x = 0; x < N; x++) {
-        const edge = x === 0 || y === 0 || x === N - 1 || y === N - 1;
-        const nearEdge = x === 1 || y === 1 || x === N - 2 || y === N - 2;
-        const color = edge ? COLORS.water : nearEdge ? COLORS.shore : (x + y) % 2 === 0 ? COLORS.landA : COLORS.landB;
+        const terrain = terrainAt(x, y);
+        let color: number;
+        if (terrain === 'water') color = COLORS.water;
+        else if (terrain === 'shore') color = COLORS.shore;
+        else if (terrain === 'mountain') color = (x + y) % 2 === 0 ? COLORS.mountainA : COLORS.mountainB;
+        else color = (x + y) % 2 === 0 ? COLORS.landA : COLORS.landB;
         g.fillStyle(color, 1);
         g.fillRect(x * T, y * T, T, T);
+        if (terrain === 'mountain') {
+          // hřebeny: trojúhelníky, nejvyšší se sněhovou čepičkou
+          const px = x * T;
+          const py = y * T;
+          g.fillStyle(0x4b443c, 1);
+          g.fillTriangle(px + T * 0.1, py + T * 0.95, px + T * 0.5, py + T * 0.1, px + T * 0.9, py + T * 0.95);
+          if ((x * 7 + y * 3) % 5 === 0) {
+            g.fillStyle(COLORS.peak, 1);
+            g.fillTriangle(px + T * 0.38, py + T * 0.36, px + T * 0.5, py + T * 0.1, px + T * 0.62, py + T * 0.36);
+          }
+        }
       }
+    }
+    // Keře a skály (nedá se na nich stavět, v budoucnu půjdou kácet)
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const o = obstacleAt(x, y);
+        if (!o) continue;
+        this.add
+          .text((x + 0.5) * T, (y + 0.55) * T, o === 'bush' ? '🌳' : '🪨', { fontFamily: emojiFont, fontSize: `${T * 0.9}px` })
+          .setOrigin(0.5)
+          .setResolution(Math.min(4, MAP_ZOOM_MAX * this.dpr))
+          .setDepth(2);
+      }
+    }
+  }
+
+  // Mlha: zamčené parcely se zakryjí poloprůhlednou clonou, aby byl vidět terén i hranice
+  private drawFog(unlocked: number[]): void {
+    const key = unlocked.join(',');
+    if (key === this.fogKey) return;
+    this.fogKey = key;
+    const set = new Set(unlocked);
+    this.fog.clear();
+    for (let i = 0; i < PARCELS_PER_SIDE * PARCELS_PER_SIDE; i++) {
+      if (set.has(i)) continue;
+      const o = parcelOrigin(i);
+      this.fog.fillStyle(COLORS.fog, MAP_FOG_ALPHA);
+      this.fog.fillRect(o.x * T, o.y * T, PARCEL_SIZE * T, PARCEL_SIZE * T);
+    }
+    // jemné ohraničení odemčené oblasti
+    this.fog.lineStyle(3, 0xffffff, 0.35);
+    for (const i of unlocked) {
+      const o = parcelOrigin(i);
+      const x0 = o.x * T;
+      const y0 = o.y * T;
+      const s = PARCEL_SIZE * T;
+      if (!set.has(i - 1) || o.x === 0) this.fog.lineBetween(x0, y0, x0, y0 + s);
+      if (!set.has(i + 1) || o.x + PARCEL_SIZE >= N) this.fog.lineBetween(x0 + s, y0, x0 + s, y0 + s);
+      if (!set.has(i - PARCELS_PER_SIDE)) this.fog.lineBetween(x0, y0, x0 + s, y0);
+      if (!set.has(i + PARCELS_PER_SIDE)) this.fog.lineBetween(x0, y0 + s, x0 + s, y0 + s);
     }
   }
 
@@ -243,13 +317,20 @@ class MapScene extends Phaser.Scene {
     );
     const end = (e: TouchEvent) => {
       if (e.touches.length < 2) this.pinchLast = 0;
-      if (e.touches.length === 0) this.pinching = false; // posun až po zvednutí všech prstů, ať mapa neskočí
+      if (e.touches.length === 0) {
+        this.pinching = false; // posun až po zvednutí všech prstů, ať mapa neskočí
+        this.held = false;
+      }
     };
     el.addEventListener('touchend', end);
     el.addEventListener('touchcancel', end);
 
     this.input.on('pointerdown', () => {
       this.dragging = false;
+      this.held = true;
+    });
+    this.input.on('pointerupoutside', () => {
+      this.held = false;
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (this.pinching || !p.isDown) return;
@@ -258,12 +339,13 @@ class MapScene extends Phaser.Scene {
         if (moved < MAP_DRAG_THRESHOLD_PX * this.dpr) return;
         this.dragging = true;
       }
-      cam.scrollX -= (p.x - p.prevPosition.x) / cam.zoom;
-      cam.scrollY -= (p.y - p.prevPosition.y) / cam.zoom;
+      this.cx -= (p.x - p.prevPosition.x) / cam.zoom;
+      this.cy -= (p.y - p.prevPosition.y) / cam.zoom;
     });
     // Klepnutí (ne tažení, ne přiblížení) na odpad: vytřídí 1 VO, po LITTER_CLICKS klepnutích hromádka zmizí
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
       this.pinchLast = 0;
+      this.held = false;
       if (this.dragging || this.pinching || performance.now() - this.pinchedAt < 350) return;
       this.tapAt(p);
     });
@@ -382,8 +464,53 @@ class MapScene extends Phaser.Scene {
     this.litterSynced = true;
   }
 
-  update(): void {
+  // Kam smí střed kamery: v odemčeném území (s malým okrajem). Když je výřez větší než území, drží se na středu území.
+  private clampedCenter(): { x: number; y: number } {
+    const cam = this.cameras.main;
+    const b = this.bounds;
+    const margin = T * 1.5;
+    const hw = cam.width / cam.zoom / 2;
+    const hh = cam.height / cam.zoom / 2;
+    const fit = (lo: number, hi: number, half: number, c: number) => {
+      let min = lo * T - margin + half;
+      let max = hi * T + margin - half;
+      if (min > max) {
+        // výřez je větší než odemčené území (oddálení): drž ho aspoň uvnitř celé mapy
+        min = half;
+        max = WORLD - half;
+        if (min > max) return WORLD / 2;
+      }
+      return Phaser.Math.Clamp(c, min, max);
+    };
+    return { x: fit(b.x0, b.x1, hw, this.cx), y: fit(b.y0, b.y1, hh, this.cy) };
+  }
+
+  // Gumové natažení: za okrajem odemčeného území se mapa táhne čím dál hůř (nejvýš MAP_RUBBER_STRETCH_TILES dlaždic)
+  private elastic(over: number): number {
+    const r = MAP_RUBBER_STRETCH_TILES * T;
+    return Math.sign(over) * r * (1 - Math.exp(-Math.abs(over) / r));
+  }
+
+  // Každý snímek: po puštění se mapa pružně vrací ke kraji odemčeného území, zobrazuje se se „gumou“
+  private updateCamera(deltaMs: number): void {
+    const cam = this.cameras.main;
+    const c = this.clampedCenter();
+    if (!this.held && !this.pinching) {
+      const k = 1 - Math.exp(-(deltaMs / 1000) * MAP_RUBBER_SPRING);
+      this.cx += (c.x - this.cx) * k;
+      this.cy += (c.y - this.cy) * k;
+      if (Math.abs(c.x - this.cx) < 0.3) this.cx = c.x;
+      if (Math.abs(c.y - this.cy) < 0.3) this.cy = c.y;
+    }
+    const c2 = this.clampedCenter();
+    cam.centerOn(c2.x + this.elastic(this.cx - c2.x), c2.y + this.elastic(this.cy - c2.y));
+  }
+
+  update(_time: number, delta: number): void {
     const v = this.getView();
+    this.bounds = unlockedBounds(v.unlocked);
+    this.drawFog(v.unlocked);
+    this.updateCamera(delta);
     const cam = this.cameras.main;
     // Popisky mají stálou velikost na obrazovce, při velkém oddálení se zmenší (ať se nepřekrývají)
     const factor = Phaser.Math.Clamp(cam.zoom / this.dpr, 0.5, 1);

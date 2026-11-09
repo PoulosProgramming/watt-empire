@@ -1,4 +1,4 @@
-import { START_HOUR, type UpgradeId } from './balance';
+import { PARCEL_START, START_HOUR, type UpgradeId } from './balance';
 import { initLitter } from './litter';
 
 // Hromádka odpadu na mapě: dlaždice a kolik klepnutí zbývá, než zmizí
@@ -28,6 +28,7 @@ export interface GameState {
   contractMet: boolean; // splněna smlouva (město aspoň jednou dostalo smluvních MW)
   toxic: boolean; // ekologická krize začala (toxický odpad)
   toxicCountdown: number; // sekundy do spuštění krize (-1 = odpočet neběží)
+  unlockedParcels: number[]; // odemčené parcely mapy (indexy, viz mapdata)
   story: string[]; // scénky starosty, které už nastaly (id), v pořadí
   ambientDay: number; // poslední herní den, pro který se řešila občasná hláška starosty
   litter: Litter[]; // odpad rozsetý po mapě (ruční třídění klepáním)
@@ -86,6 +87,7 @@ export function newGame(): GameState {
     contractMet: false,
     toxic: false,
     toxicCountdown: -1,
+    unlockedParcels: [...PARCEL_START],
     story: [],
     ambientDay: 1,
     litter: [],

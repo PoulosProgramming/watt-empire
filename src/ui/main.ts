@@ -519,6 +519,7 @@ createMap($('map'), () => ({
   solarMW: state.live.solarMW,
   solarCapMW: solarCapacityMW(state),
   litter: state.litter,
+  unlocked: state.unlockedParcels,
 }), (x, y) => collectLitter(state, x, y));
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce

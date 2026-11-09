@@ -277,22 +277,29 @@ export const AMBIENT_LINES: Record<number, string[]> = {
 };
 
 // ---- Mapa (jen vzhled, simulace o ní neví) ----
-export const MAP_GRID_SIZE = 20; // mřížka 20×20 dlaždic
+export const MAP_GRID_SIZE = 32; // mřížka 32×32 dlaždic
 export const MAP_TILE_PX = 32; // velikost dlaždice ve světových pixelech
-export const MAP_INCINERATOR_TILE = { x: 9, y: 9 }; // levý horní roh spalovny (2×2) uprostřed
-export const MAP_CITY_TILE = { x: 16, y: 16 }; // levý horní roh města (3×3) vpravo dole
-export const MAP_SOLAR_TILE = { x: 3, y: 13 }; // sluneční panely vlevo dole (4×2 dlaždice)
+export const MAP_INCINERATOR_TILE = { x: 11, y: 11 }; // levý horní roh spalovny (2×2)
+export const MAP_CITY_TILE = { x: 16, y: 16 }; // levý horní roh města (3×3) vpravo dole od spalovny
+export const MAP_SOLAR_TILE = { x: 9, y: 16 }; // sluneční panely vlevo dole od spalovny (4×2 dlaždice), než je nahradí stavění
 // Místa kolem spalovny, kde se objevují hromady toxického odpadu (dlaždice)
 export const MAP_WASTE_SPOTS = [
-  { x: 7, y: 8 },
-  { x: 7, y: 11 },
-  { x: 12, y: 8 },
+  { x: 9, y: 10 },
+  { x: 9, y: 13 },
+  { x: 14, y: 10 },
+  { x: 10, y: 14 },
+  { x: 13, y: 14 },
   { x: 8, y: 12 },
-  { x: 11, y: 12 },
-  { x: 6, y: 10 },
-  { x: 12, y: 11 },
-  { x: 10, y: 7 },
+  { x: 14, y: 13 },
+  { x: 12, y: 9 },
 ];
+// Parcely: území se odemyká po čtvercích PARCEL_SIZE×PARCEL_SIZE dlaždic. Na začátku je odemčené okolí spalovny a města (3×3 parcely = 12×12 dlaždic).
+export const PARCEL_SIZE = 4;
+export const PARCELS_PER_SIDE = MAP_GRID_SIZE / PARCEL_SIZE; // 8 × 8 parcel
+export const PARCEL_START: number[] = [2, 3, 4].flatMap((py) => [2, 3, 4].map((px) => py * PARCELS_PER_SIDE + px));
+export const MAP_RUBBER_STRETCH_TILES = 3; // jak daleko se dá mapu „natáhnout“ za okraj odemčeného území (gumové natažení)
+export const MAP_RUBBER_SPRING = 9; // jak rychle se mapa po puštění vrací zpět (větší = rychleji)
+export const MAP_FOG_ALPHA = 0.55; // průhlednost mlhy nad zamčenými parcelami (0 = nic, 1 = zakrývá úplně)
 export const MAP_ZOOM_START = 1.1; // počáteční přiblížení (viditelná je jen část mapy)
 export const MAP_ZOOM_MAX = 2.5;
 export const MAP_DRAG_THRESHOLD_PX = 8; // posun mapy až po pohybu prstu o tolik pixelů

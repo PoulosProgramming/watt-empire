@@ -193,7 +193,13 @@ Dřívější struktura, ponechaná jako zdroj nápadů:
 - **První budovy na mapě:** **baterie, sklad odpadu a likvidátor**.
 - **Vztah k menu:** dnešní číselná vylepšení (sluneční panely, sklad odpadu, likvidátor, baterie) se **nahradí budovami na mapě**.
 
-### Návrh (k odsouhlasení, zatím nic z toho není v kódu)
+### Dořešeno 9. 11. (odpovědi autora)
+
+- **Propojení soustav:** **dotykem po dlaždicích**. Zdroj vyrábí, jen když k němu vede souvislý řetěz dotýkajících se dlaždic až do města.
+- **Cesty (silnice):** slouží **k odvozu odpadu** (sklad a likvidátor musí být cestou napojené na spalovnu) **a také** jako prestiž a dekorace (zvedají cenu energie).
+- **Mapa:** **32×32**, na začátku odemčeno ~12×12 (okolí spalovny a města). Hotovo v kódu: terén, mlha a pohyb jako v TSTO.
+
+### Návrh (k odsouhlasení, části zbývají)
 
 - **Soustava = řetěz, který končí ve městě.** Každá budova a každá dlaždice vodiče je buď zdroj, vodič, přeměna, nebo spotřebitel. Zdroj vyrábí, jen když k němu vede **souvislý řetěz dotýkajících se dlaždic až do města**. Nepřipojené budovy mají na mapě ⚠️.
 - **FVE (kapitola 3):** panely 1×1 (lepí se k sobě) → drát → **střídač** → **trafo** → vedení → město. Výkon = počet připojených panelů × výkon panelu, shora omezený střídačem, ten trafem a to vedením.

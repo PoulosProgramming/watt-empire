@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { LITTER_CLEAN_COUNT, LITTER_CREW_SIZE, LITTER_DIRTY_COUNT, AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
+import { MAP_GRID_SIZE, PARCEL_START, PARCEL_SIZE, PARCELS_PER_SIDE, MAP_CITY_TILE, LITTER_CLEAN_COUNT, LITTER_CREW_SIZE, LITTER_DIRTY_COUNT, AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { solarMW } from '../src/sim/power';
 import { runCrisis } from '../src/sim/quests';
 import { checkStory, storyText } from '../src/sim/story';
 import { collectLitter, initLitter, runLitter, spawnLitter } from '../src/sim/litter';
-import { isBlockedTile } from '../src/sim/mapdata';
+import { coastX, isBuildableTile, isLitterTile, isUnlockedTile, mountainY, obstacleAt, parcelIndex, terrainAt, unlockedBounds } from '../src/sim/mapdata';
 import { deserialize, serialize } from '../src/sim/save';
 import { cityDemandRangeMW } from '../src/sim/power';
 import { newGame } from '../src/sim/state';
@@ -740,7 +740,7 @@ describe('odpad na mapě', () => {
     const s = newGame();
     expect(s.litter.length).toBe(LITTER_INITIAL);
     for (const l of s.litter) {
-      expect(isBlockedTile(l.x, l.y)).toBe(false);
+      expect(isLitterTile(s.unlockedParcels, l.x, l.y)).toBe(true);
       expect(l.left).toBe(LITTER_CLICKS);
     }
     const a = MAP_INCINERATOR_TILE;
@@ -995,5 +995,101 @@ describe('úklidová četa a přibývání odpadu', () => {
     s.litter.push({ x: 4, y: 4, left: 5 });
     tick(s);
     expect(s.doneQuests).toContain('c2_island');
+  });
+});
+
+describe('mapa: terén a parcely', () => {
+  it('mapa je 32×32 a parcely 4×4 dávají 8×8 parcel', () => {
+    expect(MAP_GRID_SIZE).toBe(32);
+    expect(PARCELS_PER_SIDE).toBe(8);
+    expect(PARCEL_START.length).toBe(9); // 3×3 parcely = 12×12 dlaždic odemčeno na začátku
+  });
+
+  it('vlevo je pobřeží (voda a pláž), na severu hory, vpravo a dole pevnina', () => {
+    expect(terrainAt(0, 20)).toBe('water');
+    expect(terrainAt(coastX(20) - 1, 20)).toBe('shore');
+    expect(terrainAt(coastX(20), 20 )).not.toBe('water');
+    expect(terrainAt(16, 0)).toBe('mountain');
+    expect(terrainAt(MAP_GRID_SIZE - 1, MAP_GRID_SIZE - 1)).toBe('land');
+    expect(terrainAt(MAP_GRID_SIZE - 1, 12)).toBe('land');
+    expect(terrainAt(16, MAP_GRID_SIZE - 1)).toBe('land');
+  });
+
+  it('pobřeží je členité (ne rovná čára) a drží se mimo odemčené území', () => {
+    const xs = new Set<number>();
+    for (let y = 0; y < MAP_GRID_SIZE; y++) {
+      xs.add(coastX(y));
+      expect(coastX(y)).toBeGreaterThanOrEqual(2);
+      expect(coastX(y)).toBeLessThanOrEqual(6);
+      expect(mountainY(y)).toBeGreaterThanOrEqual(2);
+      expect(mountainY(y)).toBeLessThanOrEqual(6);
+    }
+    expect(xs.size).toBeGreaterThanOrEqual(3); // aspoň tři různé hodnoty = zálivy a mysy
+  });
+
+  it('keře a skály existují, ale jen na pevnině a nikdy pod budovou', () => {
+    let bushes = 0;
+    let rocks = 0;
+    for (let y = 0; y < MAP_GRID_SIZE; y++) {
+      for (let x = 0; x < MAP_GRID_SIZE; x++) {
+        const o = obstacleAt(x, y);
+        if (o) {
+          expect(terrainAt(x, y)).toBe('land');
+          expect(isBuildableTile(x, y)).toBe(false);
+          if (o === 'bush') bushes++;
+          else rocks++;
+        }
+      }
+    }
+    expect(bushes).toBeGreaterThan(5);
+    expect(rocks).toBeGreaterThan(5);
+  });
+
+  it('terén je při každém spuštění stejný (deterministický)', () => {
+    const snap = () => {
+      const a: string[] = [];
+      for (let y = 0; y < MAP_GRID_SIZE; y++) for (let x = 0; x < MAP_GRID_SIZE; x++) a.push(`${terrainAt(x, y)}${obstacleAt(x, y) ?? ''}`);
+      return a.join(',');
+    };
+    expect(snap()).toBe(snap());
+  });
+
+  it('odemčené území na začátku (12×12) je celé pevnina, kde se dá stavět a uklízet', () => {
+    const s = newGame();
+    let free = 0;
+    for (let y = 0; y < MAP_GRID_SIZE; y++) {
+      for (let x = 0; x < MAP_GRID_SIZE; x++) {
+        if (!isUnlockedTile(s.unlockedParcels, x, y)) continue;
+        expect(terrainAt(x, y)).toBe('land'); // žádná voda ani hory v odemčené části
+        if (isBuildableTile(x, y)) free++;
+      }
+    }
+    expect(free).toBeGreaterThan(60); // dost volných dlaždic pro stavění
+  });
+
+  it('spalovna a město stojí v odemčeném území', () => {
+    const s = newGame();
+    expect(isUnlockedTile(s.unlockedParcels, MAP_INCINERATOR_TILE.x, MAP_INCINERATOR_TILE.y)).toBe(true);
+    expect(isUnlockedTile(s.unlockedParcels, MAP_CITY_TILE.x + 2, MAP_CITY_TILE.y + 2)).toBe(true);
+  });
+
+  it('obdélník odemčeného území obalí všechny odemčené parcely', () => {
+    const b = unlockedBounds(PARCEL_START);
+    expect(b).toEqual({ x0: 8, y0: 8, x1: 20, y1: 20 });
+    expect(parcelIndex(8, 8)).toBe(2 * PARCELS_PER_SIDE + 2);
+    expect(PARCEL_SIZE).toBe(4);
+  });
+
+  it('odpad nikdy neleží v zamčené části mapy', () => {
+    const s = newGame();
+    for (let i = 0; i < 40; i++) spawnLitter(s);
+    for (const l of s.litter) expect(isUnlockedTile(s.unlockedParcels, l.x, l.y)).toBe(true);
+  });
+
+  it('starší uložení: odpad z dlaždic, kde už ležet nesmí, se při načtení zahodí', () => {
+    const old = JSON.stringify({ v: 1, state: { credits: 1, litter: [{ x: 1, y: 1, left: 5 }, { x: 31, y: 31, left: 5 }, { x: 13, y: 15, left: 3 }] } });
+    const s = deserialize(old)!;
+    expect(s.litter.some((l) => l.x === 1 && l.y === 1)).toBe(false);
+    expect(s.litter.some((l) => l.x === 31 && l.y === 31)).toBe(false); // zamčená parcela
   });
 });
