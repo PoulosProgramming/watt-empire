@@ -1008,10 +1008,10 @@ describe('úklidová četa a přibývání odpadu', () => {
     expect(s.story).toContain('s_crew_start');
     s.upgrades.worker = 12;
     checkStory(s);
-    expect(s.story).toContain('s_crew12');
+    expect(s.story).toContain('s_crew10');
   });
 
-  it('úkoly kapitoly 2: četa 12 brigádníků a čistý ostrov', () => {
+  it('úkoly kapitoly 2: četa 10 brigádníků a čistý ostrov', () => {
     const s = newGame();
     s.chapter = 2;
     s.upgrades.worker = 12;
