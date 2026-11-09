@@ -3,7 +3,7 @@ import {
   CITY_NIGHT_FACTOR,
   DAY_START_HOUR,
   NIGHT_START_HOUR,
-  SECONDS_PER_GAME_HOUR,
+  SECONDS_PER_CLOCK_HOUR,
 } from './balance';
 import type { GameState } from './state';
 
@@ -19,7 +19,7 @@ export function demandFactor(hour: number): number {
 }
 
 export function advanceTime(s: GameState, dt: number): void {
-  s.hour += dt / SECONDS_PER_GAME_HOUR;
+  s.hour += dt / SECONDS_PER_CLOCK_HOUR;
   while (s.hour >= 24) {
     s.hour -= 24;
     s.day += 1;

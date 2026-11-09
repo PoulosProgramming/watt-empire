@@ -4,7 +4,8 @@
 export const TICKS_PER_SECOND = 4; // simulace se počítá 4× za sekundu
 
 // ---- Čas ----
-export const SECONDS_PER_GAME_HOUR = 15; // 1 herní hodina = 15 s => den (24 h) = 6 min
+export const SECONDS_PER_GAME_HOUR = 15; // 1 "energetická hodina" = 15 s: z ní se počítá MWh, ceny i spotřeba VO (neměnit, rozhodilo by to celou ekonomiku)
+export const SECONDS_PER_CLOCK_HOUR = 45; // jak rychle běží hodiny dne a noci (den = 18 min; původně 6 min, hráč chtěl pomaleji)
 export const DAY_START_HOUR = 6; // od 6:00 je den
 export const NIGHT_START_HOUR = 18; // od 18:00 je noc
 export const START_HOUR = 8;
@@ -343,7 +344,7 @@ export const MAP_WASTE_SPOTS = [
 // Parcely: území se odemyká po čtvercích PARCEL_SIZE×PARCEL_SIZE dlaždic. Na začátku je odemčené okolí spalovny a města (3×3 parcely = 12×12 dlaždic).
 export const PARCEL_SIZE = 4;
 export const PARCELS_PER_SIDE = MAP_GRID_SIZE / PARCEL_SIZE; // 8 × 8 parcel
-export const PARCEL_START: number[] = [2, 3, 4].flatMap((py) => [2, 3, 4].map((px) => py * PARCELS_PER_SIDE + px));
+export const PARCEL_START: number[] = [1, 2, 3, 4, 5, 6].flatMap((py) => [1, 2, 3, 4, 5, 6].map((px) => py * PARCELS_PER_SIDE + px)); // 6×6 parcel = 24×24 dlaždic odemčeno na začátku
 export const MAP_RUBBER_STRETCH_TILES = 3; // jak daleko se dá mapu „natáhnout“ za okraj odemčeného území (gumové natažení)
 export const MAP_RUBBER_SPRING = 9; // jak rychle se mapa po puštění vrací zpět (větší = rychleji)
 export const MAP_FOG_ALPHA = 0.55; // průhlednost mlhy nad zamčenými parcelami (0 = nic, 1 = zakrývá úplně)

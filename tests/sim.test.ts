@@ -1019,7 +1019,7 @@ describe('mapa: terén a parcely', () => {
   it('mapa je 32×32 a parcely 4×4 dávají 8×8 parcel', () => {
     expect(MAP_GRID_SIZE).toBe(32);
     expect(PARCELS_PER_SIDE).toBe(8);
-    expect(PARCEL_START.length).toBe(9); // 3×3 parcely = 12×12 dlaždic odemčeno na začátku
+    expect(PARCEL_START.length).toBe(36); // 6×6 parcel = 24×24 dlaždic odemčeno na začátku
   });
 
   it('vlevo je pobřeží (voda a pláž), na severu hory, vpravo a dole pevnina', () => {
@@ -1071,17 +1071,17 @@ describe('mapa: terén a parcely', () => {
     expect(snap()).toBe(snap());
   });
 
-  it('odemčené území na začátku (12×12) je celé pevnina, kde se dá stavět a uklízet', () => {
+  it('odemčené území na začátku (24×24) obsahuje spalovnu a město a hodně volné pevniny', () => {
     const s = newGame();
     let free = 0;
     for (let y = 0; y < MAP_GRID_SIZE; y++) {
       for (let x = 0; x < MAP_GRID_SIZE; x++) {
         if (!isUnlockedTile(s.unlockedParcels, x, y)) continue;
-        expect(terrainAt(x, y)).toBe('land'); // žádná voda ani hory v odemčené části
         if (isBuildableTile(x, y)) free++;
       }
     }
-    expect(free).toBeGreaterThan(60); // dost volných dlaždic pro stavění
+    expect(isUnlockedTile(s.unlockedParcels, MAP_CITY_TILE.x, MAP_CITY_TILE.y)).toBe(true);
+    expect(free).toBeGreaterThan(250); // dost volných dlaždic pro stavění
   });
 
   it('spalovna a město stojí v odemčeném území', () => {
@@ -1092,8 +1092,8 @@ describe('mapa: terén a parcely', () => {
 
   it('obdélník odemčeného území obalí všechny odemčené parcely', () => {
     const b = unlockedBounds(PARCEL_START);
-    expect(b).toEqual({ x0: 8, y0: 8, x1: 20, y1: 20 });
-    expect(parcelIndex(8, 8)).toBe(2 * PARCELS_PER_SIDE + 2);
+    expect(b).toEqual({ x0: 4, y0: 4, x1: 28, y1: 28 });
+    expect(parcelIndex(4, 4)).toBe(1 * PARCELS_PER_SIDE + 1);
     expect(PARCEL_SIZE).toBe(4);
   });
 
@@ -1255,7 +1255,8 @@ describe('dokupování parcel', () => {
     const ok = purchasableParcels(s);
     for (const i of ok) expect(s.unlockedParcels).not.toContain(i);
     expect(ok).not.toContain(0); // parcela 0 (hory a moře nahoře vlevo) neleží vedle odemčeného území
-    expect(ok.length).toBeLessThanOrEqual(12);
+    expect(ok.length).toBeGreaterThan(0);
+    expect(ok.length).toBeLessThanOrEqual(28);
   });
 
   it('každá další parcela je dražší, peníze se strhnou a mlha zmizí', () => {
