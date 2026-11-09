@@ -2,7 +2,7 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; touch-action: manipulation; }
 /* Rozložení: mapa přes celou plochu, nahoře karty, záložky s emoji na boku a menu přes mapu */
 #app { position: relative; width: 100%; height: 100dvh; }
-#map { position: absolute; inset: 0; overflow: hidden; touch-action: none; background: #0b3b5c; }
+#map { position: absolute; inset: 0; overflow: hidden; touch-action: none; background: #0e5a8f; }
 #map canvas { display: block; touch-action: none; }
 #hud { position: absolute; top: 8px; left: 8px; right: 66px; max-width: 460px; z-index: 5; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
 #hud > * { pointer-events: auto; }
@@ -18,10 +18,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0f172a; col
 .sheetbody { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; -webkit-overflow-scrolling: touch; }
 .sheetbody [hidden] { display: none; }
 h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin: 18px 0 6px; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.stat { color: inherit; font-weight: 400; font-size: inherit; min-height: 44px; background: rgba(30, 41, 59, .92); box-shadow: 0 2px 8px rgba(0,0,0,.4); border-radius: 10px; padding: 8px; text-align: center; }
-.stat b { display: block; font-size: 20px; }
-.stat small { color: #94a3b8; font-size: 12px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 40px; gap: 6px; }
+.stat { color: inherit; font-weight: 400; font-size: inherit; min-height: 44px; background: rgba(30, 41, 59, .92); box-shadow: 0 2px 8px rgba(0,0,0,.4); border-radius: 10px; padding: 8px 4px; text-align: center; }
+.stat b { display: block; font-size: 16px; white-space: nowrap; }
+.stat small { color: #94a3b8; font-size: 11px; white-space: nowrap; }
 .card { background: #1e293b; border-radius: 10px; padding: 10px; margin-bottom: 8px; }
 .row { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; padding: 2px 0; }
 button { min-height: 48px; min-width: 44px; border: 0; border-radius: 10px; font-size: 16px; font-weight: 600; background: #2563eb; color: #fff; padding: 8px 14px; }
@@ -67,7 +67,7 @@ small { color: #94a3b8; }
 .modal.good .modal-ok { background: #16a34a; }
 .modal-ok { width: 100%; min-height: 52px; background: #dc2626; font-size: 18px; }
 
-.map-night { position: absolute; inset: 0; background: rgba(10, 16, 48, .4); opacity: 0; transition: opacity 1.5s; pointer-events: none; }
+.map-night { position: absolute; inset: 0; background: rgba(16, 28, 110, .38); opacity: 0; transition: opacity 1.5s; pointer-events: none; }
 #clock { align-self: flex-start; background: rgba(30, 41, 59, .92); border-radius: 999px; padding: 4px 12px; font-size: 14px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
 .bar.trust i { background: #4ade80; }
 
@@ -94,3 +94,26 @@ small { color: #94a3b8; }
 .bld-cost.poor { color: #f87171; }
 .bld-status { display: block; margin-bottom: 8px; }
 .modal-cancel { width: 100%; min-height: 48px; margin-top: 8px; background: #475569; font-size: 16px; }
+
+.questbtn { position: relative; font-size: 22px; padding: 0; }
+#questbang { position: absolute; top: -5px; right: -5px; min-width: 20px; height: 20px; line-height: 20px; border-radius: 10px; background: #ef4444; color: #fff; font: 700 14px/20px system-ui, sans-serif; font-style: normal; animation: bang 1s ease-in-out infinite; }
+@keyframes bang { 50% { transform: scale(1.25); } }
+
+#questpop { position: absolute; top: 62px; right: 0; max-width: 250px; background: #1e3a8a; border: 1px solid #60a5fa; border-radius: 10px; padding: 8px 12px; font-size: 14px; line-height: 1.3; box-shadow: 0 4px 14px rgba(0,0,0,.5); pointer-events: auto; cursor: pointer; z-index: 6; }
+#questpop[hidden] { display: none; }
+#questpop::before { content: ''; position: absolute; top: -7px; right: 16px; border: 7px solid transparent; border-top: 0; border-bottom-color: #60a5fa; }
+
+#tutorial { position: fixed; left: 12px; right: 74px; bottom: 14px; max-width: 460px; z-index: 9; padding: 10px 14px; background: #0f2a4a; border: 2px solid #38bdf8; border-radius: 14px; box-shadow: 0 6px 22px rgba(0,0,0,.6); }
+#tutorial[hidden] { display: none; }
+#tutorial small { color: #7dd3fc; }
+#tutorial p { margin: 4px 0 8px; font-size: 15px; line-height: 1.35; }
+#tutorial div { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.tut-next { min-height: 44px; padding: 0 18px; background: #0284c7; font-weight: 700; }
+.tut-skip { min-height: 44px; background: transparent; color: #94a3b8; font-size: 13px; text-decoration: underline; }
+.tut-glow { animation: tutglow 1s ease-in-out infinite; }
+@keyframes tutglow { 50% { box-shadow: 0 0 0 4px #38bdf8, 0 0 18px 6px #38bdf8; } }
+
+.map-glow { position: absolute; left: 0; top: 0; border-radius: 50%; opacity: 0; transition: opacity 1.5s; pointer-events: none; will-change: transform; }
+.map-glow.furnace { background: radial-gradient(circle, rgba(255, 150, 50, .75) 0%, rgba(255, 120, 30, .35) 40%, rgba(255, 100, 20, 0) 70%); }
+.map-glow.city { background: radial-gradient(circle, rgba(255, 225, 120, .7) 0%, rgba(255, 210, 100, .32) 40%, rgba(255, 200, 80, 0) 70%); }
+#grid b.plus { color: #4ade80; } #grid b.minus { color: #f87171; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAP_GRID_SIZE, PARCEL_START, PARCEL_SIZE, PARCELS_PER_SIDE, MAP_CITY_TILE, LITTER_CLEAN_COUNT, LITTER_CREW_SIZE, LITTER_DIRTY_COUNT, AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
+import { TUTORIAL_STEPS, MAP_GRID_SIZE, PARCEL_START, PARCEL_SIZE, PARCELS_PER_SIDE, MAP_CITY_TILE, LITTER_CLEAN_COUNT, LITTER_CREW_SIZE, LITTER_DIRTY_COUNT, AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { solarMW } from '../src/sim/power';
@@ -959,17 +959,26 @@ describe('úklidová četa a přibývání odpadu', () => {
     expect(s.litter.length).toBe(LITTER_MAX);
   });
 
-  it('četa o počtu LITTER_CREW_SIZE odpad udrží, víc brigádníků ostrov vyčistí', () => {
+  it('četa o počtu LITTER_CREW_SIZE ostrov vyčistí a drží čistý, menší četa nestačí', () => {
     const hold = crew(LITTER_CREW_SIZE);
     const n0 = hold.litter.length;
     run(hold, 3000);
-    expect(Math.abs(hold.litter.length - n0)).toBeLessThanOrEqual(3);
+    expect(hold.litter.length).toBeLessThanOrEqual(LITTER_CLEAN_COUNT); // četa stíhá, nový odpad se ani neukáže
     const clean = crew(LITTER_CREW_SIZE * 2);
     run(clean, 3000);
     expect(clean.litter.length).toBeLessThanOrEqual(LITTER_CLEAN_COUNT);
     const few = crew(3);
     run(few, 3000);
     expect(few.litter.length).toBeGreaterThan(n0); // 3 brigádníci nestačí, odpad přibývá
+  });
+
+  it('četa, která stíhá, uklízí v pozadí: na mapě nic nepřibude, ale statistiky rostou', () => {
+    const s = crew(LITTER_CREW_SIZE);
+    s.litter = [];
+    const c0 = s.litterCleaned;
+    run(s, 600);
+    expect(s.litter.length).toBe(0);
+    expect(s.litterCleaned - c0).toBeGreaterThanOrEqual(600 / LITTER_RESPAWN_SECONDS - 2);
   });
 
   it('brigádníci bez peněz na mzdy neuklízejí', () => {
@@ -980,10 +989,11 @@ describe('úklidová četa a přibývání odpadu', () => {
     expect(s.litter.length).toBeGreaterThanOrEqual(n0);
   });
 
-  it('úklid četou se nezapočítává mezi hráčem uklizené hromádky', () => {
+  it('úklid četou se počítá mezi uklizené hromádky (pro průběžné úkoly)', () => {
     const s = crew(LITTER_CREW_SIZE * 2);
+    const n0 = s.litter.length;
     run(s, 3000);
-    expect(s.litterCleaned).toBe(0);
+    expect(s.litterCleaned).toBeGreaterThanOrEqual(n0);
   });
 
   it('starosta upozorní, když se ostrov zaplevelí, a v kapitole 2 žádá četu', () => {
@@ -1019,7 +1029,7 @@ describe('mapa: terén a parcely', () => {
   it('mapa je 32×32 a parcely 4×4 dávají 8×8 parcel', () => {
     expect(MAP_GRID_SIZE).toBe(32);
     expect(PARCELS_PER_SIDE).toBe(8);
-    expect(PARCEL_START.length).toBe(9); // 3×3 parcely = 12×12 dlaždic odemčeno na začátku
+    expect(PARCEL_START.length).toBe(36); // 6×6 parcel = 24×24 dlaždic odemčeno na začátku
   });
 
   it('vlevo je pobřeží (voda a pláž), na severu hory, vpravo a dole pevnina', () => {
@@ -1071,17 +1081,17 @@ describe('mapa: terén a parcely', () => {
     expect(snap()).toBe(snap());
   });
 
-  it('odemčené území na začátku (12×12) je celé pevnina, kde se dá stavět a uklízet', () => {
+  it('odemčené území na začátku (24×24) obsahuje spalovnu a město a hodně volné pevniny', () => {
     const s = newGame();
     let free = 0;
     for (let y = 0; y < MAP_GRID_SIZE; y++) {
       for (let x = 0; x < MAP_GRID_SIZE; x++) {
         if (!isUnlockedTile(s.unlockedParcels, x, y)) continue;
-        expect(terrainAt(x, y)).toBe('land'); // žádná voda ani hory v odemčené části
         if (isBuildableTile(x, y)) free++;
       }
     }
-    expect(free).toBeGreaterThan(60); // dost volných dlaždic pro stavění
+    expect(isUnlockedTile(s.unlockedParcels, MAP_CITY_TILE.x, MAP_CITY_TILE.y)).toBe(true);
+    expect(free).toBeGreaterThan(250); // dost volných dlaždic pro stavění
   });
 
   it('spalovna a město stojí v odemčeném území', () => {
@@ -1092,8 +1102,8 @@ describe('mapa: terén a parcely', () => {
 
   it('obdélník odemčeného území obalí všechny odemčené parcely', () => {
     const b = unlockedBounds(PARCEL_START);
-    expect(b).toEqual({ x0: 8, y0: 8, x1: 20, y1: 20 });
-    expect(parcelIndex(8, 8)).toBe(2 * PARCELS_PER_SIDE + 2);
+    expect(b).toEqual({ x0: 4, y0: 4, x1: 28, y1: 28 });
+    expect(parcelIndex(4, 4)).toBe(1 * PARCELS_PER_SIDE + 1);
     expect(PARCEL_SIZE).toBe(4);
   });
 
@@ -1255,7 +1265,8 @@ describe('dokupování parcel', () => {
     const ok = purchasableParcels(s);
     for (const i of ok) expect(s.unlockedParcels).not.toContain(i);
     expect(ok).not.toContain(0); // parcela 0 (hory a moře nahoře vlevo) neleží vedle odemčeného území
-    expect(ok.length).toBeLessThanOrEqual(12);
+    expect(ok.length).toBeGreaterThan(0);
+    expect(ok.length).toBeLessThanOrEqual(28);
   });
 
   it('každá další parcela je dražší, peníze se strhnou a mlha zmizí', () => {
@@ -1301,5 +1312,15 @@ describe('dokupování parcel', () => {
     let placed = false;
     for (let dy = 0; dy < 4 && !placed; dy++) for (let dx = 0; dx < 4 && !placed; dx++) placed = placeBuilding(s, 'road', o.x + dx, o.y + dy) === 'ok';
     expect(placed).toBe(true);
+  });
+});
+
+describe('tutorial', () => {
+  it('nová hra začíná tutoriálem, starší uložení ho přeskočí', () => {
+    expect(newGame().tutorial).toBe(0);
+    const old = JSON.parse(serialize(newGame()));
+    delete old.state.tutorial;
+    expect(deserialize(JSON.stringify(old))!.tutorial).toBeGreaterThanOrEqual(TUTORIAL_STEPS.length);
+    expect(deserialize(serialize(newGame()))!.tutorial).toBe(0);
   });
 });

@@ -65,18 +65,18 @@ const WORLD = N * T;
 
 // Barvy (zatím jen jednoduché čtverce a emoji místo grafiky)
 const COLORS = {
-  water: 0x0b3b5c,
-  landA: 0x6b7d4f,
-  landB: 0x62744a,
-  shore: 0xb5a06a,
-  mountainA: 0x6f665b,
-  mountainB: 0x5f574d,
+  water: 0x0e5a8f,
+  landA: 0x6fa33f,
+  landB: 0x649836,
+  shore: 0xe6c978,
+  mountainA: 0x8a7458,
+  mountainB: 0x7c684e,
   peak: 0xe5e7eb,
-  fog: 0x0b1220,
-  incinerator: 0xd9531e,
+  fog: 0x3b4a63,
+  incinerator: 0xf0561a,
   incineratorIdle: 0x7a2e12,
   incineratorOff: 0x555a60,
-  city: 0x4b6cb7,
+  city: 0x3f6fe0,
   wire: 0xffd23f,
   wireDim: 0x6b5a1e,
 };
@@ -84,6 +84,8 @@ const COLORS = {
 class MapScene extends Phaser.Scene {
   private getView!: () => MapView;
   private nightEl!: HTMLElement;
+  private glowFurnace!: HTMLElement;
+  private glowCity!: HTMLElement;
   private dpr = 1;
   private incinerator!: Phaser.GameObjects.Rectangle;
   private incineratorLabel!: Phaser.GameObjects.Text;
@@ -122,11 +124,13 @@ class MapScene extends Phaser.Scene {
     super('map');
   }
 
-  init(data: { getView: () => MapView; onCollect: CollectFn; onTileTap: TileTapFn; nightEl: HTMLElement; dpr: number }): void {
+  init(data: { getView: () => MapView; onCollect: CollectFn; onTileTap: TileTapFn; nightEl: HTMLElement; glowFurnace: HTMLElement; glowCity: HTMLElement; dpr: number }): void {
     this.getView = data.getView;
     this.onCollect = data.onCollect;
     this.onTileTap = data.onTileTap;
     this.nightEl = data.nightEl;
+    this.glowFurnace = data.glowFurnace;
+    this.glowCity = data.glowCity;
     this.dpr = data.dpr;
   }
 
@@ -189,7 +193,7 @@ class MapScene extends Phaser.Scene {
           // hřebeny: trojúhelníky, nejvyšší se sněhovou čepičkou
           const px = x * T;
           const py = y * T;
-          g.fillStyle(0x4b443c, 1);
+          g.fillStyle(0x5e4a35, 1);
           g.fillTriangle(px + T * 0.1, py + T * 0.95, px + T * 0.5, py + T * 0.1, px + T * 0.9, py + T * 0.95);
           if ((x * 7 + y * 3) % 5 === 0) {
             g.fillStyle(COLORS.peak, 1);
@@ -648,6 +652,20 @@ class MapScene extends Phaser.Scene {
 
     // Noc: tmavý závoj (HTML vrstva nad mapou, jen vizuálně)
     this.nightEl.style.opacity = v.isNight ? '1' : '0';
+    // Záře kolem spalovny (když vyrábí) a města (když dostává proud): HTML vrstva nad závojem, jen v noci
+    const cam2 = this.cameras.main;
+    const placeGlow = (el: HTMLElement, tx: number, ty: number, tiles: number, strength: number) => {
+      const sx = ((tx * T - cam2.worldView.x) * cam2.zoom) / this.dpr;
+      const sy = ((ty * T - cam2.worldView.y) * cam2.zoom) / this.dpr;
+      const r = (tiles * T * cam2.zoom) / this.dpr;
+      el.style.width = el.style.height = `${r * 2}px`;
+      el.style.transform = `translate(${sx - r}px, ${sy - r}px)`;
+      el.style.opacity = v.isNight ? String(Math.max(0, Math.min(1, strength))) : '0';
+    };
+    const run = v.incineratorRunning ? 0.5 + 0.5 * Math.min(1, v.productionMW / Math.max(1, v.nominalMW)) : 0;
+    const supply = v.deliveredMW > 0.05 ? 0.5 + 0.5 * Math.min(1, v.deliveredMW / Math.max(1, v.demandMW)) : 0;
+    placeGlow(this.glowFurnace, MAP_INCINERATOR_TILE.x + 1, MAP_INCINERATOR_TILE.y + 1, 5, run);
+    placeGlow(this.glowCity, MAP_CITY_TILE.x + 1.5, MAP_CITY_TILE.y + 1.5, 6, supply);
 
     // Spalovna: barva podle stavu + popisek s čísly
     const a = MAP_INCINERATOR_TILE;
@@ -701,11 +719,16 @@ export function createMap(parent: HTMLElement, getView: () => MapView, onCollect
   const nightEl = document.createElement('div');
   nightEl.className = 'map-night';
   parent.appendChild(nightEl);
+  const glowFurnace = document.createElement('div');
+  glowFurnace.className = 'map-glow furnace';
+  const glowCity = document.createElement('div');
+  glowCity.className = 'map-glow city';
+  parent.append(glowFurnace, glowCity);
 
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    backgroundColor: '#0b3b5c',
+    backgroundColor: '#0e5a8f',
     scale: {
       mode: Phaser.Scale.NONE,
       width: Math.max(1, Math.round((parent.clientWidth || 360) * dpr)),
@@ -716,7 +739,7 @@ export function createMap(parent: HTMLElement, getView: () => MapView, onCollect
     input: { touch: true, mouse: true },
     callbacks: {
       postBoot: (g) => {
-        g.scene.add('map', MapScene, true, { getView, onCollect, onTileTap, nightEl, dpr });
+        g.scene.add('map', MapScene, true, { getView, onCollect, onTileTap, nightEl, glowFurnace, glowCity, dpr });
       },
     },
   });

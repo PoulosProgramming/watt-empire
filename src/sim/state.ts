@@ -38,6 +38,7 @@ export interface GameState {
   buildings: Building[]; // budovy postavené na mapě
   buildVersion: number; // zvyšuje se při každé změně budov (pro paměť propojení)
   unlockedParcels: number[]; // odemčené parcely mapy (indexy, viz mapdata)
+  tutorial: number; // krok tutoriálu (TUTORIAL_STEPS.length a víc = hotovo)
   story: string[]; // scénky starosty, které už nastaly (id), v pořadí
   ambientDay: number; // poslední herní den, pro který se řešila občasná hláška starosty
   litter: Litter[]; // odpad rozsetý po mapě (ruční třídění klepáním)
@@ -99,6 +100,7 @@ export function newGame(): GameState {
     buildings: [],
     buildVersion: 0,
     unlockedParcels: [...PARCEL_START],
+    tutorial: 0,
     story: [],
     ambientDay: 1,
     litter: [],

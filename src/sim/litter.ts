@@ -54,7 +54,7 @@ export function initLitter(s: GameState): void {
 }
 
 // Brigádníci pravidelně uklízejí ostrov: každý uklidí hromádku za LITTER_WORKER_CLEAN_SECONDS (zadarmo, VO dávají jinak).
-// Když stojí (nejsou peníze na mzdy), neuklízejí. Uklizená hromádka se nezapočítává do hráčova uklizeného odpadu.
+// Když stojí (nejsou peníze na mzdy), neuklízejí. Uklizená hromádka se počítá do celkově uklizených (litterCleaned).
 function runCrew(s: GameState, dt: number): void {
   const workers = s.upgrades.worker;
   if (workers === 0 || s.live.workersPaused || s.litter.length === 0) {
@@ -65,12 +65,23 @@ function runCrew(s: GameState, dt: number): void {
   while (s.litterCrewAcc >= 1 && s.litter.length > 0) {
     s.litterCrewAcc -= 1;
     s.litter.splice(Math.floor(nextRandom(s) * s.litter.length), 1);
+    s.litterCleaned += 1; // hromádky uklizené četou se počítají do celkových (průběžné úkoly)
   }
 }
 
 // Nový odpad se objevuje pomalu, dokud je na mapě místo (strop LITTER_MAX)
 export function runLitter(s: GameState, dt: number): void {
   runCrew(s, dt);
+  // Četa stíhá uklízet víc, než odpadu přibývá: nový odpad se na mapě vůbec neukáže (jen se započítá)
+  if (s.upgrades.worker > 0 && !s.live.workersPaused && s.upgrades.worker / LITTER_WORKER_CLEAN_SECONDS >= 1 / LITTER_RESPAWN_SECONDS) {
+    // Odpad se uklidí „v pozadí“: na mapě se neobjeví, ale zapíše se do statistik
+    s.litterTimer += dt;
+    while (s.litterTimer >= LITTER_RESPAWN_SECONDS) {
+      s.litterTimer -= LITTER_RESPAWN_SECONDS;
+      s.litterCleaned += 1;
+    }
+    return;
+  }
   if (s.litter.length >= LITTER_MAX) {
     s.litterTimer = 0;
     return;

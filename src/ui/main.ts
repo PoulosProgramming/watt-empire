@@ -25,7 +25,12 @@ import {
   MAYOR_AVATAR,
   MAYOR_NAME,
   ONGOING_UNLOCK_QUEST,
+  TUTORIAL_STEPS,
   QUESTS,
+  LITTER_CREW_SIZE,
+  LITTER_RESPAWN_SECONDS,
+  WORKER_VO_PER_SECOND,
+  LITTER_WORKER_CLEAN_SECONDS,
   QUESTS_VISIBLE,
   STORY_INTRO,
   TOAST_SECONDS,
@@ -92,7 +97,9 @@ app.innerHTML = `
       <button class="stat" data-stat="credits"><b id="credits"></b><small id="income"></small></button>
       <button class="stat" data-stat="energy"><b id="energy"></b><small id="power"></small></button>
       <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
+      <button class="stat questbtn" id="questbtn" aria-label="Úkoly">📋<i id="questbang">!</i></button>
     </div>
+    <div id="questpop" hidden></div>
     <div id="clock"></div>
     <div id="modebar"></div>
     <div id="statdetail"></div>
@@ -210,12 +217,60 @@ function showNextDialog(): void {
   });
   document.body.appendChild(el);
 }
+// Tutorial: panel dole s vysvětlením, krok se přepne sám po splnění úkolu
+const tutorialEl = document.createElement('div');
+tutorialEl.id = 'tutorial';
+tutorialEl.hidden = true;
+document.body.appendChild(tutorialEl);
+const tutorialActive = () => state.tutorial < TUTORIAL_STEPS.length;
+let tutorialShown = -1;
+function tutorialDone(): boolean {
+  const w = TUTORIAL_STEPS[state.tutorial].wait;
+  switch (w.kind) {
+    case 'button':
+      return false;
+    case 'taps':
+      return state.taps >= w.n;
+    case 'cleaned':
+      return state.litterCleaned >= w.n;
+    case 'vo':
+      return state.vo >= w.n;
+    case 'tab':
+      return openTab === w.tab;
+    case 'upgrade':
+      return (state.upgrades[w.id] ?? 0) >= w.n;
+  }
+}
+function updateTutorial(): void {
+  if (tutorialActive() && tutorialDone()) state.tutorial++;
+  if (state.tutorial === tutorialShown) return;
+  tutorialShown = state.tutorial;
+  document.querySelectorAll('.tut-glow').forEach((e) => e.classList.remove('tut-glow'));
+  if (!tutorialActive()) {
+    tutorialEl.hidden = true;
+    return;
+  }
+  const step = TUTORIAL_STEPS[state.tutorial];
+  if (step.glow) document.querySelector(step.glow)?.classList.add('tut-glow');
+  const isButton = step.wait.kind === 'button';
+  const last = state.tutorial === TUTORIAL_STEPS.length - 1;
+  tutorialEl.hidden = false;
+  tutorialEl.innerHTML =
+    `<small>Tutorial ${state.tutorial + 1} / ${TUTORIAL_STEPS.length}</small><p>${step.text}</p>` +
+    `<div>${isButton ? `<button class="tut-next">${last ? 'Jdeme na to!' : 'Dál'}</button>` : ''}<button class="tut-skip">Přeskočit tutoriál</button></div>`;
+}
+tutorialEl.addEventListener('click', (e) => {
+  const el = e.target as HTMLElement;
+  if (el.closest('.tut-next')) state.tutorial++;
+  else if (el.closest('.tut-skip')) state.tutorial = TUTORIAL_STEPS.length;
+});
+
 function announceStory(): void {
   while (seenStory < state.story.length) {
     dialogQueue.push(state.story[seenStory++]);
     if (dialogQueue.length > 3) dialogQueue.shift(); // po delší pauze jen poslední tři
   }
-  showNextDialog();
+  if (!tutorialActive()) showNextDialog();
 }
 
 // Velký popup při postupu do další kapitoly a na konci poslední (po načtení hry se už proběhlé neukazují)
@@ -239,6 +294,32 @@ function announceCrisis(): void {
     seenToxic = true;
     showModal(TOXIC_POPUP_TITLE, TOXIC_POPUP_TEXT);
   }
+}
+
+// Úkoly, které hráč právě vidí v záložce 📋 (hlavní po třech + odemčené průběžné)
+function visibleQuestIds(s: typeof state): string[] {
+  const main = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) === s.chapter && !s.doneQuests.includes(q.id));
+  const leftovers = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) < s.chapter && !s.doneQuests.includes(q.id));
+  const ids = [...main, ...leftovers].slice(0, QUESTS_VISIBLE).map((q) => q.id);
+  if (s.doneQuests.includes(ONGOING_UNLOCK_QUEST)) {
+    const ongoing = QUESTS.filter((q) => q.ongoing && !s.doneQuests.includes(q.id) && (!q.upgrade || isUnlocked(s, q.upgrade)));
+    ids.push(...ongoing.slice(0, ONGOING_QUESTS_VISIBLE).map((q) => q.id));
+  }
+  return ids;
+}
+// Nový úkol: malý popup nahoře u tlačítka 📋
+const knownVisible = new Set<string>(visibleQuestIds(state));
+let questPopTimer = 0;
+function announceNewQuests(): void {
+  const fresh = visibleQuestIds(state).filter((id) => !knownVisible.has(id));
+  if (fresh.length === 0) return;
+  fresh.forEach((id) => knownVisible.add(id));
+  const q = QUESTS.find((x) => x.id === fresh[0])!;
+  const pop = $('questpop');
+  pop.innerHTML = `📋 <b>Nový úkol</b><br>${q.text}${fresh.length > 1 ? `<br><small>…a ${fresh.length - 1} další</small>` : ''}`;
+  pop.hidden = false;
+  clearTimeout(questPopTimer);
+  questPopTimer = window.setTimeout(() => (pop.hidden = true), TOAST_SECONDS * 1000);
 }
 
 function announceQuests(): void {
@@ -397,8 +478,10 @@ const TAB_TITLES: Record<string, string> = {
   debug: '⚙️ Ladění',
 };
 let openTab = '';
+let questsSeenCount = -1; // kolik úkolů bylo hotových, když hráč naposled otevřel úkoly (-1 = ještě nikdy)
 function showTab(name: string): void {
   openTab = name;
+  if (name === 'quests') questsSeenCount = state.doneQuests.length;
   $('sheet').hidden = !name;
   $('sheettitle').textContent = TAB_TITLES[name] ?? '';
   document.querySelectorAll<HTMLElement>('[data-sheet]').forEach((el) => (el.hidden = el.dataset.sheet !== name));
@@ -407,6 +490,11 @@ function showTab(name: string): void {
 document.querySelectorAll<HTMLElement>('.tab').forEach((el) =>
   el.addEventListener('click', () => showTab(openTab === el.dataset.tab ? '' : el.dataset.tab!)),
 );
+$('questpop').addEventListener('click', () => {
+  $('questpop').hidden = true;
+  showTab('quests');
+});
+$('questbtn').addEventListener('click', () => showTab(openTab === 'quests' ? '' : 'quests'));
 $('sheetclose').addEventListener('click', () => showTab(''));
 
 $('toggle').addEventListener('click', () => {
@@ -445,6 +533,7 @@ $('debug').appendChild(resetBtn);
 $('bonus').addEventListener('click', () => (state.credits += DEBUG_CREDITS_BONUS));
 
 function render(): void {
+  $('questbang').style.display = state.doneQuests.length !== questsSeenCount && openTab !== 'quests' ? 'block' : 'none';
   renderBuildMenu();
   renderModebar();
   const s = state;
@@ -492,10 +581,12 @@ function render(): void {
     const voNet = l.voPerSecond - l.voBurnedPerSecond;
     detail =
       line('Brigádníci', `+${fmt(l.voPerSecond, 2)}/s`, 'plus') +
+      line('Úklid ostrova (brigádníci)', `${fmt((s.upgrades.worker * 60) / LITTER_WORKER_CLEAN_SECONDS, 1)} hromádek/min`, 'plus') +
+      line('Odpadu přibývá', `${fmt(60 / LITTER_RESPAWN_SECONDS, 1)} hromádek/min`, 'minus') +
+      line('Ostrov', s.upgrades.worker * 60 / LITTER_WORKER_CLEAN_SECONDS >= 60 / LITTER_RESPAWN_SECONDS ? '✔ četa stíhá, odpad se na mapě neukazuje' : '✖ četa nestíhá, uklízej taky ručně') +
       line('Ruční třídění', `${s.taps} klepnutí, ${s.litterCleaned} hromádek`) +
       line('Spálí spalovna', `−${fmt(l.voBurnedPerSecond, 2)}/s`, 'minus') +
       line('Spalovna potřebuje', `${fmt(l.voNeedPerSecond, 2)}/s`) +
-      line('Autonomie', l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : `✖ chybí ${fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2)} VO/s (najmi brigádníka, kup účinnost nebo klikej)`, l.autonomous ? 'plus' : 'minus') +
       line('Celkem (bez tapů)', signed(voNet), 'total') +
       line('Sklad', `${fmt(s.vo, 0)} / ${fmt(voStorageMax(s), 0)} VO`) +
       line('Cena VO navíc (nad sklad)', `${VO_OVERFLOW_PRICE} 💰 / VO`) +
@@ -516,6 +607,9 @@ function render(): void {
     <div class="row"><span>Prestiž města</span><b>${prestige(s)}</b></div>
     <div class="row"><span>Spotřeba města</span><b>${fmt(l.demandMW)} MW</b></div>
     <div class="row"><span>${s.chapter >= 2 ? 'Odběr města (bere, co vedení unese)' : 'Smlouva (stálý odběr)'}</span><b>${s.chapter >= 2 ? fmt(range.max) + ' MW' : fmt(range.max) + ' MW, den i noc'}</b></div>
+    <div class="row"><span>Autonomie</span><b class="${l.autonomous ? 'plus' : 'minus'}">${l.autonomous ? '✔ brigádníci stačí, nemusíš klikat' : '✖ chybí ' + fmt(Math.max(0, l.voNeedPerSecond - l.voPerSecond), 2) + ' VO/s'}</b></div>
+    <div class="row"><span>VO: brigádníci dodají / spalovna potřebuje</span><b>${fmt(l.voPerSecond, 2)} / ${fmt(l.voNeedPerSecond, 2)} /s</b></div>
+    ${l.autonomous ? '' : '<small>Najmi brigádníka, kup účinnost spalovny, nebo klepej na odpad.</small>'}
     <div class="row"><span>Výroba</span><b>${fmt(l.productionMW)} MW</b></div>
     <div class="row"><span>Dodáváme</span><b>${fmt(l.deliveredMW)} / ${lineCapacityMW(s)} MW (vedení)</b></div>
     <div class="row"><span>Baterie</span><b>${fmt(s.battery)} / ${bcap} MWh ${l.batteryFlowMW > 0.01 ? '⬆' : l.batteryFlowMW < -0.01 ? '⬇' : ''}</b></div>
@@ -560,6 +654,13 @@ function render(): void {
     if (def.id === 'efficiency' && !max) {
       const now = (incineratorNominalMW(s) * s.incineratorLevel / SECONDS_PER_GAME_HOUR) * voPerMWh(s, INCINERATOR_VO_PER_MWH);
       desc = `Stejný výkon za méně VO: spalovna spálí ${fmt(now, 2)} VO/s, po koupi ${fmt(now * EFFICIENCY_VO_FACTOR, 2)} VO/s.`;
+    }
+    if (def.id === 'worker') {
+      const need = l.voNeedPerSecond;
+      const have = lvl * WORKER_VO_PER_SECOND;
+      const after = (lvl + 1) * WORKER_VO_PER_SECOND;
+      desc += `<br>⚙️ Autonomie výroby: ${fmt(have, 1)} / ${fmt(need, 1)} VO/s ${have >= need ? '✔' : '✖'}${max ? '' : `, po koupi ${fmt(after, 1)}`}` +
+        `<br>🧹 Autonomie úklidu: ${lvl} / ${LITTER_CREW_SIZE} brigádníků ${lvl >= LITTER_CREW_SIZE ? '✔ ostrov je čistý' : '✖ odpad na mapě přibývá'}`;
     }
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
@@ -664,6 +765,8 @@ createMap($('map'), () => ({
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce
 let last = performance.now();
+let lastRender = 0;
+const RENDER_EVERY_MS = 100; // texty a menu stačí překreslit 10× za sekundu
 let acc = 0;
 function frame(now: number): void {
   acc += Math.min(0.5, (now - last) / 1000) * speed;
@@ -673,10 +776,15 @@ function frame(now: number): void {
     acc -= TICK_DT;
   }
   announceQuests();
+  announceNewQuests();
   announceCrisis();
   announceChapter();
+  updateTutorial();
   announceStory();
-  render();
+  if (now - lastRender >= RENDER_EVERY_MS) {
+    lastRender = now;
+    render();
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

@@ -25,6 +25,8 @@ export function deserialize(text: string | null): GameState | null {
       live: { ...base.live, ...(saved.live ?? {}) },
       doneQuests: Array.isArray(saved.doneQuests) ? saved.doneQuests : [],
     };
+    // Starší uložení tutoriál nemělo: hráč už hru zná, tak se přeskočí
+    if (typeof saved.tutorial !== 'number') loaded.tutorial = 9999;
     // Krize patří až do kapitoly 2: starší uložení z kapitoly 1 s už spuštěnou krizí se vyčistí
     if (loaded.chapter < TOXIC_TRIGGER_CHAPTER) {
       loaded.toxic = false;
