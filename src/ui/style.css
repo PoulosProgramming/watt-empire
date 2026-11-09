@@ -67,7 +67,7 @@ small { color: #94a3b8; }
 .modal.good .modal-ok { background: #16a34a; }
 .modal-ok { width: 100%; min-height: 52px; background: #dc2626; font-size: 18px; }
 
-.map-night { position: absolute; inset: 0; background: rgba(10, 16, 48, .4); opacity: 0; transition: opacity 1.5s; pointer-events: none; }
+.map-night { position: absolute; inset: 0; background: rgba(16, 28, 110, .38); opacity: 0; transition: opacity 1.5s; pointer-events: none; }
 #clock { align-self: flex-start; background: rgba(30, 41, 59, .92); border-radius: 999px; padding: 4px 12px; font-size: 14px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
 .bar.trust i { background: #4ade80; }
 
@@ -112,3 +112,7 @@ small { color: #94a3b8; }
 .tut-skip { min-height: 44px; background: transparent; color: #94a3b8; font-size: 13px; text-decoration: underline; }
 .tut-glow { animation: tutglow 1s ease-in-out infinite; }
 @keyframes tutglow { 50% { box-shadow: 0 0 0 4px #38bdf8, 0 0 18px 6px #38bdf8; } }
+
+.map-glow { position: absolute; left: 0; top: 0; border-radius: 50%; opacity: 0; transition: opacity 1.5s; pointer-events: none; will-change: transform; }
+.map-glow.furnace { background: radial-gradient(circle, rgba(255, 150, 50, .75) 0%, rgba(255, 120, 30, .35) 40%, rgba(255, 100, 20, 0) 70%); }
+.map-glow.city { background: radial-gradient(circle, rgba(255, 225, 120, .7) 0%, rgba(255, 210, 100, .32) 40%, rgba(255, 200, 80, 0) 70%); }
