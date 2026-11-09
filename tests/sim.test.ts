@@ -959,11 +959,11 @@ describe('úklidová četa a přibývání odpadu', () => {
     expect(s.litter.length).toBe(LITTER_MAX);
   });
 
-  it('četa o počtu LITTER_CREW_SIZE odpad udrží, víc brigádníků ostrov vyčistí', () => {
+  it('četa o počtu LITTER_CREW_SIZE ostrov vyčistí a drží čistý, menší četa nestačí', () => {
     const hold = crew(LITTER_CREW_SIZE);
     const n0 = hold.litter.length;
     run(hold, 3000);
-    expect(Math.abs(hold.litter.length - n0)).toBeLessThanOrEqual(3);
+    expect(hold.litter.length).toBeLessThanOrEqual(LITTER_CLEAN_COUNT); // četa stíhá, nový odpad se ani neukáže
     const clean = crew(LITTER_CREW_SIZE * 2);
     run(clean, 3000);
     expect(clean.litter.length).toBeLessThanOrEqual(LITTER_CLEAN_COUNT);

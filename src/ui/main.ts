@@ -27,6 +27,8 @@ import {
   ONGOING_UNLOCK_QUEST,
   TUTORIAL_STEPS,
   QUESTS,
+  LITTER_RESPAWN_SECONDS,
+  LITTER_WORKER_CLEAN_SECONDS,
   QUESTS_VISIBLE,
   STORY_INTRO,
   TOAST_SECONDS,
@@ -577,6 +579,9 @@ function render(): void {
     const voNet = l.voPerSecond - l.voBurnedPerSecond;
     detail =
       line('Brigádníci', `+${fmt(l.voPerSecond, 2)}/s`, 'plus') +
+      line('Úklid ostrova (brigádníci)', `${fmt((s.upgrades.worker * 60) / LITTER_WORKER_CLEAN_SECONDS, 1)} hromádek/min`, 'plus') +
+      line('Odpadu přibývá', `${fmt(60 / LITTER_RESPAWN_SECONDS, 1)} hromádek/min`, 'minus') +
+      line('Ostrov', s.upgrades.worker * 60 / LITTER_WORKER_CLEAN_SECONDS >= 60 / LITTER_RESPAWN_SECONDS ? '✔ četa stíhá, odpad se na mapě neukazuje' : '✖ četa nestíhá, uklízej taky ručně') +
       line('Ruční třídění', `${s.taps} klepnutí, ${s.litterCleaned} hromádek`) +
       line('Spálí spalovna', `−${fmt(l.voBurnedPerSecond, 2)}/s`, 'minus') +
       line('Spalovna potřebuje', `${fmt(l.voNeedPerSecond, 2)}/s`) +
