@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAP_GRID_SIZE, PARCEL_START, PARCEL_SIZE, PARCELS_PER_SIDE, MAP_CITY_TILE, LITTER_CLEAN_COUNT, LITTER_CREW_SIZE, LITTER_DIRTY_COUNT, AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
+import { TUTORIAL_STEPS, MAP_GRID_SIZE, PARCEL_START, PARCEL_SIZE, PARCELS_PER_SIDE, MAP_CITY_TILE, LITTER_CLEAN_COUNT, LITTER_CREW_SIZE, LITTER_DIRTY_COUNT, AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { solarMW } from '../src/sim/power';
@@ -1301,5 +1301,15 @@ describe('dokupování parcel', () => {
     let placed = false;
     for (let dy = 0; dy < 4 && !placed; dy++) for (let dx = 0; dx < 4 && !placed; dx++) placed = placeBuilding(s, 'road', o.x + dx, o.y + dy) === 'ok';
     expect(placed).toBe(true);
+  });
+});
+
+describe('tutorial', () => {
+  it('nová hra začíná tutoriálem, starší uložení ho přeskočí', () => {
+    expect(newGame().tutorial).toBe(0);
+    const old = JSON.parse(serialize(newGame()));
+    delete old.state.tutorial;
+    expect(deserialize(JSON.stringify(old))!.tutorial).toBeGreaterThanOrEqual(TUTORIAL_STEPS.length);
+    expect(deserialize(serialize(newGame()))!.tutorial).toBe(0);
   });
 });

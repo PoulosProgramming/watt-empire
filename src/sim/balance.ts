@@ -385,3 +385,29 @@ export const AUTOSAVE_SECONDS = 60; // jak často se postup ukládá (navíc př
 // ---- Ladění ----
 export const DEBUG_SPEEDS = [1, 10];
 export const DEBUG_CREDITS_BONUS = 1000;
+
+// ---------- Tutorial (první minuty hry) ----------
+// Krok se přepne sám, když hráč splní podmínku `wait` (nebo klepne na „Dál“, když je podmínka `button`).
+export type TutorialWait =
+  | { kind: 'button' }
+  | { kind: 'taps'; n: number } // celkem klepnutí na odpad
+  | { kind: 'cleaned'; n: number } // uklizených hromádek
+  | { kind: 'vo'; n: number } // zásoba VO
+  | { kind: 'tab'; tab: string } // otevřená záložka
+  | { kind: 'upgrade'; id: UpgradeId; n: number };
+export interface TutorialStep {
+  text: string;
+  wait: TutorialWait;
+  glow?: string; // CSS selektor prvku, který se rozsvítí
+}
+export const TUTORIAL_STEPS: TutorialStep[] = [
+  { text: 'Vítej! Máš spalovnu odpadu a město bez proudu. Odpad se mění na elektřinu a elektřina na peníze. Ukážu ti to krok za krokem, nikam nespěchej.', wait: { kind: 'button' } },
+  { text: 'Mapu posouváš tažením prstu a přibližuješ dvěma prsty. Hned se na ni podíváme.', wait: { kind: 'button' } },
+  { text: 'Po ostrově se válí odpad. Klepni na jednu hromádku odpadu na mapě.', wait: { kind: 'taps', n: 1 } },
+  { text: 'Každé klepnutí vytřídí 1 ♻️ VO (vytříděný odpad). Klepej na hromádku dál, až zmizí.', wait: { kind: 'cleaned', n: 1 } },
+  { text: '♻️ VO nahoře je palivo pro spalovnu. Spalovna se rozjede, až ho bude aspoň 15. Sbírej další odpad.', wait: { kind: 'vo', n: 15 } },
+  { text: 'Spalovna se rozjela! ⚡ MW je výkon, který míří do města. Město ti za něj platí 💰 kredity, ty nahoře rostou samy.', wait: { kind: 'button' } },
+  { text: 'Za kredity se vylepšuje. Otevři záložku 🏭 Spalovna vpravo.', wait: { kind: 'tab', tab: 'furnace' }, glow: '.tab[data-tab="furnace"]' },
+  { text: 'Až budeš mít dost 💰, kup vylepšení „Výkon spalovny“. Mezitím můžeš zavřít menu a dál klepat na odpad.', wait: { kind: 'upgrade', id: 'power', n: 1 } },
+  { text: 'Skvěle! Další vylepšení (třeba brigádníci, kteří třídí odpad za tebe) se odemknou postupně. Za každým krokem tě vede záložka 📋 Úkoly: červený vykřičník ukazuje, že se v ní něco změnilo, a za splněné úkoly jsou odměny. Hodně štěstí!', wait: { kind: 'button' }, glow: '#questbtn' },
+];

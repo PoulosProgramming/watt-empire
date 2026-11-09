@@ -25,6 +25,7 @@ import {
   MAYOR_AVATAR,
   MAYOR_NAME,
   ONGOING_UNLOCK_QUEST,
+  TUTORIAL_STEPS,
   QUESTS,
   QUESTS_VISIBLE,
   STORY_INTRO,
@@ -212,12 +213,60 @@ function showNextDialog(): void {
   });
   document.body.appendChild(el);
 }
+// Tutorial: panel dole s vysvětlením, krok se přepne sám po splnění úkolu
+const tutorialEl = document.createElement('div');
+tutorialEl.id = 'tutorial';
+tutorialEl.hidden = true;
+document.body.appendChild(tutorialEl);
+const tutorialActive = () => state.tutorial < TUTORIAL_STEPS.length;
+let tutorialShown = -1;
+function tutorialDone(): boolean {
+  const w = TUTORIAL_STEPS[state.tutorial].wait;
+  switch (w.kind) {
+    case 'button':
+      return false;
+    case 'taps':
+      return state.taps >= w.n;
+    case 'cleaned':
+      return state.litterCleaned >= w.n;
+    case 'vo':
+      return state.vo >= w.n;
+    case 'tab':
+      return openTab === w.tab;
+    case 'upgrade':
+      return (state.upgrades[w.id] ?? 0) >= w.n;
+  }
+}
+function updateTutorial(): void {
+  if (tutorialActive() && tutorialDone()) state.tutorial++;
+  if (state.tutorial === tutorialShown) return;
+  tutorialShown = state.tutorial;
+  document.querySelectorAll('.tut-glow').forEach((e) => e.classList.remove('tut-glow'));
+  if (!tutorialActive()) {
+    tutorialEl.hidden = true;
+    return;
+  }
+  const step = TUTORIAL_STEPS[state.tutorial];
+  if (step.glow) document.querySelector(step.glow)?.classList.add('tut-glow');
+  const isButton = step.wait.kind === 'button';
+  const last = state.tutorial === TUTORIAL_STEPS.length - 1;
+  tutorialEl.hidden = false;
+  tutorialEl.innerHTML =
+    `<small>Tutorial ${state.tutorial + 1} / ${TUTORIAL_STEPS.length}</small><p>${step.text}</p>` +
+    `<div>${isButton ? `<button class="tut-next">${last ? 'Jdeme na to!' : 'Dál'}</button>` : ''}<button class="tut-skip">Přeskočit tutoriál</button></div>`;
+}
+tutorialEl.addEventListener('click', (e) => {
+  const el = e.target as HTMLElement;
+  if (el.closest('.tut-next')) state.tutorial++;
+  else if (el.closest('.tut-skip')) state.tutorial = TUTORIAL_STEPS.length;
+});
+
 function announceStory(): void {
   while (seenStory < state.story.length) {
     dialogQueue.push(state.story[seenStory++]);
     if (dialogQueue.length > 3) dialogQueue.shift(); // po delší pauze jen poslední tři
   }
-  showNextDialog();
+  if (!tutorialActive()) showNextDialog();
 }
 
 // Velký popup při postupu do další kapitoly a na konci poslední (po načtení hry se už proběhlé neukazují)
@@ -714,6 +763,7 @@ function frame(now: number): void {
   announceNewQuests();
   announceCrisis();
   announceChapter();
+  updateTutorial();
   announceStory();
   if (now - lastRender >= RENDER_EVERY_MS) {
     lastRender = now;
