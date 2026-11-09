@@ -65,18 +65,18 @@ const WORLD = N * T;
 
 // Barvy (zatím jen jednoduché čtverce a emoji místo grafiky)
 const COLORS = {
-  water: 0x0b3b5c,
-  landA: 0x6b7d4f,
-  landB: 0x62744a,
-  shore: 0xb5a06a,
-  mountainA: 0x6f665b,
-  mountainB: 0x5f574d,
+  water: 0x0e5a8f,
+  landA: 0x6fa33f,
+  landB: 0x649836,
+  shore: 0xe6c978,
+  mountainA: 0x8a7458,
+  mountainB: 0x7c684e,
   peak: 0xe5e7eb,
-  fog: 0x0b1220,
-  incinerator: 0xd9531e,
+  fog: 0x3b4a63,
+  incinerator: 0xf0561a,
   incineratorIdle: 0x7a2e12,
   incineratorOff: 0x555a60,
-  city: 0x4b6cb7,
+  city: 0x3f6fe0,
   wire: 0xffd23f,
   wireDim: 0x6b5a1e,
 };
@@ -189,7 +189,7 @@ class MapScene extends Phaser.Scene {
           // hřebeny: trojúhelníky, nejvyšší se sněhovou čepičkou
           const px = x * T;
           const py = y * T;
-          g.fillStyle(0x4b443c, 1);
+          g.fillStyle(0x5e4a35, 1);
           g.fillTriangle(px + T * 0.1, py + T * 0.95, px + T * 0.5, py + T * 0.1, px + T * 0.9, py + T * 0.95);
           if ((x * 7 + y * 3) % 5 === 0) {
             g.fillStyle(COLORS.peak, 1);
@@ -705,7 +705,7 @@ export function createMap(parent: HTMLElement, getView: () => MapView, onCollect
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    backgroundColor: '#0b3b5c',
+    backgroundColor: '#0e5a8f',
     scale: {
       mode: Phaser.Scale.NONE,
       width: Math.max(1, Math.round((parent.clientWidth || 360) * dpr)),

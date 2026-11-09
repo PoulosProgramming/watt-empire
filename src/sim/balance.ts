@@ -347,7 +347,7 @@ export const PARCELS_PER_SIDE = MAP_GRID_SIZE / PARCEL_SIZE; // 8 × 8 parcel
 export const PARCEL_START: number[] = [1, 2, 3, 4, 5, 6].flatMap((py) => [1, 2, 3, 4, 5, 6].map((px) => py * PARCELS_PER_SIDE + px)); // 6×6 parcel = 24×24 dlaždic odemčeno na začátku
 export const MAP_RUBBER_STRETCH_TILES = 3; // jak daleko se dá mapu „natáhnout“ za okraj odemčeného území (gumové natažení)
 export const MAP_RUBBER_SPRING = 9; // jak rychle se mapa po puštění vrací zpět (větší = rychleji)
-export const MAP_FOG_ALPHA = 0.55; // průhlednost mlhy nad zamčenými parcelami (0 = nic, 1 = zakrývá úplně)
+export const MAP_FOG_ALPHA = 0.4; // průhlednost mlhy nad zamčenými parcelami (0 = nic, 1 = zakrývá úplně)
 export const MAP_ZOOM_START = 1.1; // počáteční přiblížení (viditelná je jen část mapy)
 export const MAP_ZOOM_MAX = 2.5;
 export const MAP_DRAG_THRESHOLD_PX = 8; // posun mapy až po pohybu prstu o tolik pixelů
