@@ -72,9 +72,14 @@ function runCrew(s: GameState, dt: number): void {
 // Nový odpad se objevuje pomalu, dokud je na mapě místo (strop LITTER_MAX)
 export function runLitter(s: GameState, dt: number): void {
   runCrew(s, dt);
-  // Četa stíhá uklízet víc, než odpadu přibývá: nový odpad se na mapě vůbec neukáže
+  // Četa stíhá uklízet víc, než odpadu přibývá: nový odpad se na mapě vůbec neukáže (jen se započítá)
   if (s.upgrades.worker > 0 && !s.live.workersPaused && s.upgrades.worker / LITTER_WORKER_CLEAN_SECONDS >= 1 / LITTER_RESPAWN_SECONDS) {
-    s.litterTimer = 0;
+    // Odpad se uklidí „v pozadí“: na mapě se neobjeví, ale zapíše se do statistik
+    s.litterTimer += dt;
+    while (s.litterTimer >= LITTER_RESPAWN_SECONDS) {
+      s.litterTimer -= LITTER_RESPAWN_SECONDS;
+      s.litterCleaned += 1;
+    }
     return;
   }
   if (s.litter.length >= LITTER_MAX) {

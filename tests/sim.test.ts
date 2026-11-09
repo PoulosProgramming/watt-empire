@@ -972,6 +972,15 @@ describe('úklidová četa a přibývání odpadu', () => {
     expect(few.litter.length).toBeGreaterThan(n0); // 3 brigádníci nestačí, odpad přibývá
   });
 
+  it('četa, která stíhá, uklízí v pozadí: na mapě nic nepřibude, ale statistiky rostou', () => {
+    const s = crew(LITTER_CREW_SIZE);
+    s.litter = [];
+    const c0 = s.litterCleaned;
+    run(s, 600);
+    expect(s.litter.length).toBe(0);
+    expect(s.litterCleaned - c0).toBeGreaterThanOrEqual(600 / LITTER_RESPAWN_SECONDS - 2);
+  });
+
   it('brigádníci bez peněz na mzdy neuklízejí', () => {
     const s = crew(20);
     s.credits = 0;
