@@ -70,3 +70,12 @@ small { color: #94a3b8; }
 .map-night { position: absolute; inset: 0; background: rgba(10, 16, 48, .4); opacity: 0; transition: opacity 1.5s; pointer-events: none; }
 #clock { align-self: flex-start; background: rgba(30, 41, 59, .92); border-radius: 999px; padding: 4px 12px; font-size: 14px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
 .bar.trust i { background: #4ade80; }
+
+.dialog { position: fixed; left: 12px; right: 74px; bottom: 14px; max-width: 460px; z-index: 9; display: flex; gap: 10px; padding: 10px 12px; background: #1e293b; border: 2px solid #f59e0b; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.6); animation: dlg-in .25s ease-out; }
+.dialog .dlg-avatar { font-size: 36px; line-height: 1; flex: 0 0 auto; }
+.dialog .dlg-body { flex: 1; min-width: 0; }
+.dialog .dlg-body b { color: #fbbf24; }
+.dialog .dlg-body p { margin: 4px 0 8px; font-size: 14px; line-height: 1.4; color: #e2e8f0; }
+.dialog .dlg-ok { min-height: 44px; padding: 0 22px; float: right; background: #d97706; }
+.mayor-msg { margin: 0 0 8px; font-size: 13px; line-height: 1.4; color: #cbd5e1; }
+@keyframes dlg-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }

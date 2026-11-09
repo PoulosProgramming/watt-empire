@@ -20,6 +20,8 @@ export function requirementProgress(s: GameState, r: Requirement): number {
   if (r.kind === 'fieldclean') return s.toxic && s.toxicDisposed > 0 && s.toxicField < 0.5 ? 1 : 0;
   if (r.kind === 'trust') return s.trust;
   if (r.kind === 'litter') return s.litterCleaned;
+  if (r.kind === 'toxic') return s.toxic ? 1 : 0;
+  if (r.kind === 'litterempty') return s.litterCleaned > 0 && s.litter.length === 0 ? 1 : 0;
   if (r.kind === 'upgrade') return r.upgrade ? s.upgrades[r.upgrade] : 0;
   return s.delivered;
 }

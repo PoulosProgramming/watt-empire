@@ -28,6 +28,8 @@ export interface GameState {
   contractMet: boolean; // splněna smlouva (město aspoň jednou dostalo smluvních MW)
   toxic: boolean; // ekologická krize začala (toxický odpad)
   toxicCountdown: number; // sekundy do spuštění krize (-1 = odpočet neběží)
+  story: string[]; // scénky starosty, které už nastaly (id), v pořadí
+  ambientDay: number; // poslední herní den, pro který se řešila občasná hláška starosty
   litter: Litter[]; // odpad rozsetý po mapě (ruční třídění klepáním)
   litterSeed: number; // stav generátoru náhodných čísel pro nový odpad
   litterTimer: number; // sekundy do dalšího nového odpadu
@@ -83,6 +85,8 @@ export function newGame(): GameState {
     contractMet: false,
     toxic: false,
     toxicCountdown: -1,
+    story: [],
+    ambientDay: 1,
     litter: [],
     litterSeed: 0,
     litterTimer: 0,

@@ -75,7 +75,7 @@ Z TSTO bereme jen čtyři prvky, které stojí na už existující ekonomice a n
 | Prvek | Jak funguje ve Watt Empire | Proč je levný na výrobu | Fáze |
 | --- | --- | --- | --- |
 | Rostoucí město | Městská čtvrť má vlastní parcely. Každá úroveň prestiže přidá budovu (dům, pekárna, nemocnice, továrna) a každá budova zvedne spotřebu a její špičky. | Prestiž i spotřeba už existují; jde jen o seznam budov a jejich sprity. | MVP |
-| Postavy v úkolech | Starosta a 2 až 3 postavy (technik, vědkyně) zadávají úkoly krátkým dialogem, např. starosta si stěžuje na smog ze spalovny. | Úkoly už v GDD jsou; přidává se jen text a portrét. | MVP |
+| Postavy v úkolech | Starosta a 2 až 3 postavy (technik, vědkyně) zadávají úkoly krátkým dialogem, např. starosta si stěžuje na smog ze spalovny. | Úkoly už v GDD jsou; přidává se jen text a portrét. | MVP | **Hotovo (9. 11.): starosta** zadává žádosti a komentuje průběh v okénku s dialogem (úvod, uklizení, dodávka výkonu, krize, důvěra, občasné hlášky). Další postavy zatím nejsou.
 | Dekorace s bonusem | Parky, stromy a vyčištěné pláže na uvolněných políčkách zvyšují prestiž, a tím výkupní cenu energie. | Využívá mřížku a prestiž; jen nové položky v obchodě. | Fáze 2 |
 | Časové mise | Brigádník se pošle na misi (oprava vedení 30 min, průzkum mlhy 4 h) a vrátí se s odměnou. Hlavní důvod vracet se do hry. | Jeden časovač na postavu; offline výpočet už je potřeba kvůli idle. | Fáze 2 |
 

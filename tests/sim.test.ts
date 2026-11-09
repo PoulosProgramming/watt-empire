@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CHAPTER_END_QUESTS, CONTRACT_MW, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
+import { AMBIENT_EVERY_DAYS, AMBIENT_LINES, CHAPTER_END_QUESTS, CONTRACT_MW, STORY_BEATS, LITTER_CLICKS, LITTER_INITIAL, LITTER_MAX, LITTER_NEAR_COUNT, LITTER_NEAR_RADIUS_TILES, LITTER_RESPAWN_SECONDS, MAP_INCINERATOR_TILE, CREDITS_PER_MWH, INCINERATOR_START_VO, OFFLINE_MAX_SECONDS, OFFLINE_REDUCED_RATE, QUESTS, TOXIC_DELAY_SECONDS, TOXIC_FIELD_FULL, TOXIC_INITIAL_FIELD, VO_OVERFLOW_PRICE, UPGRADES } from '../src/sim/balance';
 import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '../src/sim/economy';
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { solarMW } from '../src/sim/power';
 import { runCrisis } from '../src/sim/quests';
+import { checkStory, storyText } from '../src/sim/story';
 import { collectLitter, initLitter, runLitter, spawnLitter } from '../src/sim/litter';
 import { isBlockedTile } from '../src/sim/mapdata';
 import { deserialize, serialize } from '../src/sim/save';
@@ -835,5 +836,92 @@ describe('odpad na mapě', () => {
     const n = s.litter.length;
     simulateOffline(s, 120);
     expect(s.litter.length).toBeGreaterThan(n);
+  });
+});
+
+describe('starosta (děj)', () => {
+  it('na začátku hry se ozve starosta s úvodem', () => {
+    const s = newGame();
+    checkStory(s);
+    expect(s.story).toContain('s_start');
+    expect(storyText('s_start')).toContain('15 MW');
+  });
+
+  it('scénka se ukáže jednou, i když se kontroluje víckrát', () => {
+    const s = newGame();
+    s.litterCleaned = 5;
+    checkStory(s);
+    checkStory(s);
+    checkStory(s);
+    expect(s.story.filter((x) => x === 's_litter5').length).toBe(1);
+  });
+
+  it('scénky chodí v pořadí podle toho, co hráč dělá (první MWh, brigádník, autonomie, smlouva)', () => {
+    const s = newGame();
+    s.doneQuests = [];
+    s.delivered = 1;
+    checkStory(s);
+    expect(s.story).toContain('s_first_mwh');
+    expect(s.story).not.toContain('s_worker1');
+    s.upgrades.worker = 1;
+    checkStory(s);
+    expect(s.story).toContain('s_worker1');
+    s.contractMet = true;
+    checkStory(s);
+    expect(s.story).toContain('s_contract');
+  });
+
+  it('krize, čistá pole a důvěra spouštějí scénky kapitol 2 a 3', () => {
+    const s = newGame();
+    s.chapter = 2;
+    s.toxic = true;
+    s.toxicDisposed = 5;
+    s.toxicField = 0;
+    checkStory(s);
+    expect(s.story).toContain('s_toxic');
+    expect(s.story).toContain('s_field_clean');
+    s.chapter = 3;
+    s.trust = 61;
+    checkStory(s);
+    expect(s.story).toContain('s_chapter3');
+    expect(s.story).toContain('s_trust25');
+    expect(s.story).toContain('s_trust60');
+    expect(s.story).not.toContain('s_trust100');
+  });
+
+  it('vyklikaná mapa spustí scénku o čisté pláži', () => {
+    const s = newGame();
+    s.litter.length = 0;
+    s.litterCleaned = 36;
+    checkStory(s);
+    expect(s.story).toContain('s_litter_empty');
+  });
+
+  it('občas se starosta ozve jen tak (každý druhý den), s textem podle kapitoly', () => {
+    const s = newGame();
+    s.chapter = 2;
+    s.day = AMBIENT_EVERY_DAYS; // druhý den
+    checkStory(s);
+    const amb = s.story.find((x) => x.startsWith('amb:'))!;
+    expect(amb).toBeDefined();
+    expect(AMBIENT_LINES[2]).toContain(storyText(amb)!);
+    // v lichý den nic
+    const n = s.story.length;
+    s.day = AMBIENT_EVERY_DAYS + 1;
+    checkStory(s);
+    expect(s.story.length).toBe(n);
+  });
+
+  it('všechna id scének jsou jedinečná a každá má text', () => {
+    const ids = STORY_BEATS.map((b) => b.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const b of STORY_BEATS) expect(b.text.length).toBeGreaterThan(10);
+  });
+
+  it('scénky se ukládají a po načtení se nezačnou znovu', () => {
+    const s = newGame();
+    checkStory(s);
+    const back = deserialize(serialize(s))!;
+    expect(back.story).toEqual(s.story);
   });
 });

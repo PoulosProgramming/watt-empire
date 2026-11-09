@@ -11,6 +11,7 @@ import { runWorkers, updateOverflowRate } from './economy';
 import { runLitter } from './litter';
 import { runPower } from './power';
 import { advanceChapter, checkQuests, runCrisis } from './quests';
+import { checkStory } from './story';
 import type { GameState } from './state';
 
 export const TICK_DT = 1 / TICKS_PER_SECOND;
@@ -25,6 +26,7 @@ export function tick(s: GameState, dt: number = TICK_DT): void {
   checkQuests(s);
   advanceChapter(s);
   runCrisis(s, dt);
+  checkStory(s);
 }
 
 export interface OfflineSummary {

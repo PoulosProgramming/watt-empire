@@ -80,9 +80,9 @@ export const PRESTIGE_THRESHOLDS_MWH = [0, 500, 1200, 2800, 6500];
 // ---- Vylepšení ----
 export type UpgradeId = 'worker' | 'power' | 'efficiency' | 'line' | 'battery' | 'dump' | 'regulator' | 'cleanup' | 'storage' | 'solar';
 
-// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu) | smlouva (dosažení smluvních MW) | kapitola | uklizený odpad na mapě
+// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu) | smlouva (dosažení smluvních MW) | kapitola | uklizený odpad na mapě | začala krize | mapa je čistá
 export interface Requirement {
-  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter' | 'disposed' | 'fieldclean' | 'trust' | 'litter';
+  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter' | 'disposed' | 'fieldclean' | 'trust' | 'litter' | 'toxic' | 'litterempty';
   target: number;
   upgrade?: UpgradeId; // jen pro kind 'upgrade'
 }
@@ -168,6 +168,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'c3_trust60', chapter: 3, text: 'Důvěra veřejnosti na 60 %', kind: 'trust', target: 60, reward: 10000 },
   { id: 'c3_trust100', chapter: 3, text: 'Přesvědč veřejnost, že jsme čistý zdroj: důvěra na 100 % (konec kapitoly 3)', kind: 'trust', target: 100, reward: 20000 },
   // --- Průběžné úkoly (nepovinné, ukážou se po autonomii) ---
+  { id: 'o_litterclean', ongoing: true, text: 'Vyklikej všechen odpad z mapy (mapa čistá)', kind: 'litterempty', target: 1, reward: 400 },
   { id: 'o_litter100', ongoing: true, text: 'Uklid 100 hromádek odpadu na mapě', kind: 'litter', target: 100, reward: 600 },
   { id: 'o_litter300', ongoing: true, text: 'Uklid 300 hromádek odpadu na mapě', kind: 'litter', target: 300, reward: 2500 },
   { id: 'o_litter600', ongoing: true, text: 'Uklid 600 hromádek odpadu na mapě', kind: 'litter', target: 600, reward: 6000 },
@@ -205,6 +206,69 @@ export const CHAPTER_END_TEXT: Record<number, string> = {
 };
 export const CHAPTER_START_TEXT: Record<number, string> = {
   3: 'Ostrov je čistý, ale lidé ti pořád nevěří. Odemykají se obnovitelné zdroje, začni slunečními panely. Čím víc čisté energie dodáš, tím víc ti město bude věřit a tím víc ti zaplatí. Pozor na polední špičky ze slunce: vedení je musí unést.',
+};
+
+// ---- Postava: starosta ----
+// Starosta se v průběhu hry ozve: úvod, žádosti (dodat výkon do města, vyčistit prostor), reakce na úspěchy a krize.
+// Každá scénka se ukáže jednou, když je splněná její podmínka.
+export const MAYOR_NAME = 'Starosta';
+export const MAYOR_AVATAR = '👨‍💼';
+
+export interface StoryBeat {
+  id: string;
+  trigger: Requirement;
+  text: string;
+}
+
+export const STORY_BEATS: StoryBeat[] = [
+  // --- Kapitola 1: smlouva ---
+  { id: 's_start', trigger: { kind: 'chapter', target: 1 }, text: 'Konečně někdo, kdo se nevzdal! Město je bez proudu a tvoje spalovna je naše jediná naděje. Máme nasmlouvanou stálou dodávku 15 MW. Nejdřív ale potřebuješ palivo: na pláži se válí odpad, klepej na něj a vytřiď ho.' },
+  { id: 's_litter5', trigger: { kind: 'litter', target: 5 }, text: 'Pláž už vypadá o trochu lépe! Prosím, pokračuj. Lidé nesnesou pohled na ten nepořádek a ty z něj uděláš proud.' },
+  { id: 's_first_mwh', trigger: { kind: 'delivered', target: 1 }, text: 'Svítí! První elektřina dorazila do města. Slyšel jsi ten potlesk? Teď potřebujeme víc výkonu, jinak pomalu zhasneme.' },
+  { id: 's_power1', trigger: { kind: 'upgrade', upgrade: 'power', target: 1 }, text: 'Silnější spalovna, skvělé! Sám ale všechno nevyklikáš. Najmi si brigádníky, ať ti s odpadem pomáhají.' },
+  { id: 's_worker1', trigger: { kind: 'upgrade', upgrade: 'worker', target: 1 }, text: 'První brigádník! Ať ti pomáhá, ale nezapomeň, že ho musíš platit.' },
+  { id: 's_mwh30', trigger: { kind: 'delivered', target: 30 }, text: 'Nemocnice už má proud aspoň na pár hodin denně. Prosím tě, dodávej město dál a zvedej výkon.' },
+  { id: 's_autonomy', trigger: { kind: 'autonomy', target: 1 }, text: 'Spalovna jede sama a ty si můžeš oddechnout. Teď se soustřeď na to hlavní: slíbili jsme městu 15 MW a všichni na to čekají.' },
+  { id: 's_line1', trigger: { kind: 'upgrade', upgrade: 'line', target: 1 }, text: 'Nové dráty! Starý rozvod už dlouho nevydržel. Dej pozor, ať výkon neprojde jen do země.' },
+  { id: 's_mwh300', trigger: { kind: 'delivered', target: 300 }, text: 'Už svítí většina města. Ale mám divný pocit z toho, co spalovna za sebou nechává. Ostrov není čistý a lidé si toho všímají.' },
+  { id: 's_contract', trigger: { kind: 'contract', target: 1 }, text: 'Patnáct megawattů! Splnil jsi smlouvu, o které se říkalo, že je nesplnitelná. Děkuju ti za celý ostrov.' },
+  { id: 's_litter_empty', trigger: { kind: 'litterempty', target: 1 }, text: 'Pláž je čistá jako ze škatulky! Škoda jen, že moře splaví další odpad. Ale děkuju, že ti na tom záleží.' },
+  // --- Kapitola 2: odpad a krize ---
+  { id: 's_toxic', trigger: { kind: 'toxic', target: 1 }, text: 'Co se to děje?! Spalovna vyplivla toxický odpad na pláž a lidé se bouří. Město odmítá platit plnou cenu za špinavou energii. Musíš to uklidit, jinak nám přestanou platit úplně!' },
+  { id: 's_cleanup1', trigger: { kind: 'upgrade', upgrade: 'cleanup', target: 1 }, text: 'Likvidátor odpadu, konečně se něco děje. Jen ať to nestojí celé město, každá jednotka něco stojí.' },
+  { id: 's_storage1', trigger: { kind: 'upgrade', upgrade: 'storage', target: 1 }, text: 'Aspoň část odpadu už neleží na poli. Děti si tam hrávaly. Prosím, ať tam už nic nezůstane.' },
+  { id: 's_field_clean', trigger: { kind: 'fieldclean', target: 1 }, text: 'Pole je čisté! Poprvé po dlouhé době se tam dá chodit. Lidé si trochu vydechli.' },
+  { id: 's_disposed1000', trigger: { kind: 'disposed', target: 1000 }, text: 'Tolik odpadu pryč... Lidé se uklidňují, ale pořád říkají, že je to špinavá energie.' },
+  // --- Kapitola 3: čistý zdroj ---
+  { id: 's_chapter3', trigger: { kind: 'chapter', target: 3 }, text: 'Teď musíš lidi přesvědčit, že jsi čistý zdroj. Zkus slunce: panely nic nepálí a nezanechávají odpad. A hlavně žádný nový nepořádek na poli!' },
+  { id: 's_solar1', trigger: { kind: 'upgrade', upgrade: 'solar', target: 1 }, text: 'Sluneční panely! Přes den to vydělá, ale v noci pořád potřebujeme spalovnu. Hlídej, ať polední slunce nepřetíží vedení.' },
+  { id: 's_battery1', trigger: { kind: 'upgrade', upgrade: 'battery', target: 1 }, text: 'Baterie! Polední špičky už se neztratí, uloží se na večer. To je chytré.' },
+  { id: 's_trust25', trigger: { kind: 'trust', target: 25 }, text: 'Lidé o tobě začínají mluvit hezky. Je to teprve začátek, ale mám radost.' },
+  { id: 's_trust60', trigger: { kind: 'trust', target: 60 }, text: 'Už tě zdraví na ulici! Skoro nikdo neříká špinavá energie. Pokračuj.' },
+  { id: 's_trust100', trigger: { kind: 'trust', target: 100 }, text: 'Důvěra veřejnosti je na sto procent! Dokázal jsi, že ostrov má čistý zdroj. Jsi hrdina tohoto ostrova.' },
+];
+
+// Mezi velkými scénkami se starosta občas jen tak ozve (každý druhý herní den, řádek podle kapitoly)
+export const AMBIENT_EVERY_DAYS = 2;
+export const AMBIENT_LINES: Record<number, string[]> = {
+  1: [
+    'Slyšel jsem, že v přístavu zase našli bednu odpadu. Nemáš chvilku?',
+    'Lidé se ptají, kdy se rozsvítí lampy na náměstí. Já říkám: brzy.',
+    'Dnes ráno jsem potkal rybáře. Ryby tu prý ještě jsou, doufám, že ta spalovna nic nepokazí.',
+    'Máš dost odpadu? Kdyby ne, na pláži ho najdeš habaděj.',
+  ],
+  2: [
+    'Lidé chodí kolem pole s transparenty. Ať už je ten odpad pryč!',
+    'Novináři se ptají, kdo za to může. Říkám jim, že ty to napravíš.',
+    'Děti se mě ptají, jestli je vzduch bezpečný. Co jim mám říct?',
+    'Vím, že likvidace stojí peníze. Ale mlčet nemůžeme.',
+  ],
+  3: [
+    'Na náměstí si lidé povídají o sluneční elektrárně. To je dobré znamení.',
+    'Dnes svítí slunce, doufám, že panely makají!',
+    'Paní z pekárny říká, že chleba z čisté elektřiny chutná líp. Hloupost, ale pomáhá to.',
+    'Pozor na polední špičky, ať nám nevypadne proud.',
+  ],
 };
 
 // ---- Mapa (jen vzhled, simulace o ní neví) ----

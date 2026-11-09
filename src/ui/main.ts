@@ -18,6 +18,8 @@ import {
   CHAPTER_START_TEXT,
   CHAPTER_TITLES,
   MAX_CHAPTER,
+  MAYOR_AVATAR,
+  MAYOR_NAME,
   ONGOING_UNLOCK_QUEST,
   QUESTS,
   QUESTS_VISIBLE,
@@ -35,6 +37,7 @@ import { batteryCapacityMWh, cityDemandRangeMW, disposeRate, dumpCapacityMW, inc
 import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
 import { collectLitter } from '../sim/litter';
+import { checkStory, storyText } from '../sim/story';
 import { createMap } from './map';
 import { newGame } from '../sim/state';
 
@@ -56,7 +59,8 @@ function saveNow(): void {
     /* nejde uložit, hra běží dál */
   }
 }
-const state = loadSaved() ?? newGame();
+const savedGame = loadSaved();
+const state = savedGame ?? newGame();
 clampVO(state); // starší uložení mohlo mít víc VO, než se vejde do skladu
 setInterval(() => {
   if (document.visibilityState === 'visible') saveNow(); // v pozadí by to přepsalo čas schování
@@ -125,6 +129,8 @@ app.innerHTML = `
       <div data-sheet="info" hidden>
         <div class="card story">📖 ${STORY_INTRO}</div>
         <div id="ending"></div>
+        <h2>Zprávy od starosty</h2>
+        <div class="card" id="mayorlog"></div>
         <div class="card help">
           <p>♻️ <b>VO</b> (vytříděný odpad) pálí spalovna a vyrábí z něj ⚡ elektřinu. Město ji kupuje za 💰.</p>
           <p><b>Klepej na odpad na mapě</b> (🥤 📦 🗑️): každé klepnutí vytřídí 1 ♻️ VO a po 5 klepnutích hromádka zmizí. Nový odpad se objevuje pomalu, takže potřebuješ i brigádníky. Spalovna se rozjede, až má ve skladu dost VO. Sklad má strop; co se nevejde, se prodá za pár kreditů. Zatím běží na malý výkon, takže se nic nepřetíží.</p>
@@ -170,6 +176,36 @@ function showModal(title: string, text: string, good = false): void {
   overlay.querySelector('button')!.addEventListener('click', () => overlay.remove());
   document.body.appendChild(overlay);
 }
+// Starosta: scénky se ukazují v okénku s dialogem, jedna po druhé. Po načtení uložené hry se už proběhlé neukazují.
+checkStory(state);
+let seenStory = savedGame ? state.story.length : 0;
+const dialogQueue: string[] = [];
+let dialogOpen = false;
+function showNextDialog(): void {
+  if (dialogOpen) return;
+  const id = dialogQueue.shift();
+  if (!id) return;
+  const text = storyText(id);
+  if (!text) return showNextDialog();
+  dialogOpen = true;
+  const el = document.createElement('div');
+  el.className = 'dialog';
+  el.innerHTML = `<div class="dlg-avatar">${MAYOR_AVATAR}</div><div class="dlg-body"><b>${MAYOR_NAME}</b><p>${text}</p><button class="dlg-ok">OK</button></div>`;
+  el.querySelector('button')!.addEventListener('click', () => {
+    el.remove();
+    dialogOpen = false;
+    showNextDialog();
+  });
+  document.body.appendChild(el);
+}
+function announceStory(): void {
+  while (seenStory < state.story.length) {
+    dialogQueue.push(state.story[seenStory++]);
+    if (dialogQueue.length > 3) dialogQueue.shift(); // po delší pauze jen poslední tři
+  }
+  showNextDialog();
+}
+
 // Velký popup při postupu do další kapitoly a na konci poslední (po načtení hry se už proběhlé neukazují)
 const chapterDone = (n: number) => (CHAPTER_END_QUESTS[n] ?? []).every((id) => state.doneQuests.includes(id));
 let seenChapter = state.chapter;
@@ -398,6 +434,16 @@ function render(): void {
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
 
+  // Zprávy od starosty (posledních 8, nejnovější nahoře)
+  $('mayorlog').innerHTML =
+    s.story
+      .slice(-8)
+      .reverse()
+      .map((id) => storyText(id))
+      .filter((x): x is string => !!x)
+      .map((x) => `<p class="mayor-msg">${MAYOR_AVATAR} ${x}</p>`)
+      .join('') || '<small>Zatím žádné zprávy.</small>';
+
   // Odpad (od kapitoly 2) a důvěra veřejnosti (od kapitoly 3)
   let waste = '';
   if (s.toxic) {
@@ -488,6 +534,7 @@ function frame(now: number): void {
   announceQuests();
   announceCrisis();
   announceChapter();
+  announceStory();
   render();
   requestAnimationFrame(frame);
 }
