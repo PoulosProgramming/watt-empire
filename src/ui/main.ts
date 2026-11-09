@@ -27,7 +27,9 @@ import {
   ONGOING_UNLOCK_QUEST,
   TUTORIAL_STEPS,
   QUESTS,
+  LITTER_CREW_SIZE,
   LITTER_RESPAWN_SECONDS,
+  WORKER_VO_PER_SECOND,
   LITTER_WORKER_CLEAN_SECONDS,
   QUESTS_VISIBLE,
   STORY_INTRO,
@@ -652,6 +654,13 @@ function render(): void {
     if (def.id === 'efficiency' && !max) {
       const now = (incineratorNominalMW(s) * s.incineratorLevel / SECONDS_PER_GAME_HOUR) * voPerMWh(s, INCINERATOR_VO_PER_MWH);
       desc = `Stejný výkon za méně VO: spalovna spálí ${fmt(now, 2)} VO/s, po koupi ${fmt(now * EFFICIENCY_VO_FACTOR, 2)} VO/s.`;
+    }
+    if (def.id === 'worker') {
+      const need = l.voNeedPerSecond;
+      const have = lvl * WORKER_VO_PER_SECOND;
+      const after = (lvl + 1) * WORKER_VO_PER_SECOND;
+      desc += `<br>⚙️ Autonomie výroby: ${fmt(have, 1)} / ${fmt(need, 1)} VO/s ${have >= need ? '✔' : '✖'}${max ? '' : `, po koupi ${fmt(after, 1)}`}` +
+        `<br>🧹 Autonomie úklidu: ${lvl} / ${LITTER_CREW_SIZE} brigádníků ${lvl >= LITTER_CREW_SIZE ? '✔ ostrov je čistý' : '✖ odpad na mapě přibývá'}`;
     }
     el.innerHTML = `<span>${def.name} (úr. ${lvl})<small>${desc}</small></span><span>${max ? 'MAX' : `💰 ${cost}`}</span>`;
   }
