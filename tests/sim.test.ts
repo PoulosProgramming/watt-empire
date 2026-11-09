@@ -980,10 +980,11 @@ describe('úklidová četa a přibývání odpadu', () => {
     expect(s.litter.length).toBeGreaterThanOrEqual(n0);
   });
 
-  it('úklid četou se nezapočítává mezi hráčem uklizené hromádky', () => {
+  it('úklid četou se počítá mezi uklizené hromádky (pro průběžné úkoly)', () => {
     const s = crew(LITTER_CREW_SIZE * 2);
+    const n0 = s.litter.length;
     run(s, 3000);
-    expect(s.litterCleaned).toBe(0);
+    expect(s.litterCleaned).toBeGreaterThanOrEqual(n0);
   });
 
   it('starosta upozorní, když se ostrov zaplevelí, a v kapitole 2 žádá četu', () => {

@@ -54,7 +54,7 @@ export function initLitter(s: GameState): void {
 }
 
 // Brigádníci pravidelně uklízejí ostrov: každý uklidí hromádku za LITTER_WORKER_CLEAN_SECONDS (zadarmo, VO dávají jinak).
-// Když stojí (nejsou peníze na mzdy), neuklízejí. Uklizená hromádka se nezapočítává do hráčova uklizeného odpadu.
+// Když stojí (nejsou peníze na mzdy), neuklízejí. Uklizená hromádka se počítá do celkově uklizených (litterCleaned).
 function runCrew(s: GameState, dt: number): void {
   const workers = s.upgrades.worker;
   if (workers === 0 || s.live.workersPaused || s.litter.length === 0) {
@@ -65,6 +65,7 @@ function runCrew(s: GameState, dt: number): void {
   while (s.litterCrewAcc >= 1 && s.litter.length > 0) {
     s.litterCrewAcc -= 1;
     s.litter.splice(Math.floor(nextRandom(s) * s.litter.length), 1);
+    s.litterCleaned += 1; // hromádky uklizené četou se počítají do celkových (průběžné úkoly)
   }
 }
 
