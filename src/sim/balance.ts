@@ -357,7 +357,7 @@ export const MAP_HEIGHT_PERCENT = 46; // výška mapy v % obrazovky (zbytek je p
 // Po mapě je rozsetý odpad. Každé klepnutí dá VO_PER_TAP vytříděného odpadu, po LITTER_CLICKS klepnutích hromádka zmizí.
 // Nový odpad se objevuje pomalu a přibývá dál, i když hráč nehraje (strop LITTER_MAX). Ze začátku jde odpad stíhat
 // klepáním, později je potřeba úklidová četa z brigádníků.
-export const LITTER_CLICKS = 10; // kolik klepnutí na jednu hromádku
+export const LITTER_CLICKS = 5; // kolik klepnutí na jednu hromádku
 export const LITTER_INITIAL = 36; // kolik hromádek je na mapě na začátku
 export const LITTER_NEAR_COUNT = 14; // z toho blízko spalovny (ať je hned vidět, kam klikat)
 export const LITTER_NEAR_RADIUS_TILES = 6; // co je „blízko“ spalovny
