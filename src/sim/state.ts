@@ -1,5 +1,12 @@
-import { PARCEL_START, START_HOUR, type UpgradeId } from './balance';
+import { PARCEL_START, START_HOUR, type BuildingType, type UpgradeId } from './balance';
 import { initLitter } from './litter';
+
+// Budova postavená hráčem: druh a levý horní roh (velikost je v BUILDINGS)
+export interface Building {
+  type: BuildingType;
+  x: number;
+  y: number;
+}
 
 // Hromádka odpadu na mapě: dlaždice a kolik klepnutí zbývá, než zmizí
 export interface Litter {
@@ -28,6 +35,8 @@ export interface GameState {
   contractMet: boolean; // splněna smlouva (město aspoň jednou dostalo smluvních MW)
   toxic: boolean; // ekologická krize začala (toxický odpad)
   toxicCountdown: number; // sekundy do spuštění krize (-1 = odpočet neběží)
+  buildings: Building[]; // budovy postavené na mapě
+  buildVersion: number; // zvyšuje se při každé změně budov (pro paměť propojení)
   unlockedParcels: number[]; // odemčené parcely mapy (indexy, viz mapdata)
   story: string[]; // scénky starosty, které už nastaly (id), v pořadí
   ambientDay: number; // poslední herní den, pro který se řešila občasná hláška starosty
@@ -75,7 +84,7 @@ export function newGame(): GameState {
     day: 1,
     taps: 0,
     delivered: 0,
-    upgrades: { worker: 0, power: 0, efficiency: 0, line: 0, battery: 0, dump: 0, regulator: 0, cleanup: 0, storage: 0, solar: 0 },
+    upgrades: { worker: 0, power: 0, efficiency: 0, line: 0, dump: 0, regulator: 0, solar: 0 },
     incineratorOn: true,
     incineratorRunning: false,
     incineratorLevel: 1,
@@ -87,6 +96,8 @@ export function newGame(): GameState {
     contractMet: false,
     toxic: false,
     toxicCountdown: -1,
+    buildings: [],
+    buildVersion: 0,
     unlockedParcels: [...PARCEL_START],
     story: [],
     ambientDay: 1,

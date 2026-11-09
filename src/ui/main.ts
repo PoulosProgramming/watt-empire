@@ -1,6 +1,10 @@
 import './style.css';
 import {
   AUTOSAVE_SECONDS,
+  BUILDINGS,
+  BUILDING_REFUND,
+  PARCEL_UNLOCK_CHAPTER,
+  type BuildingType,
   DEBUG_CREDITS_BONUS,
   DEBUG_SPEEDS,
   EFFICIENCY_VO_FACTOR,
@@ -36,7 +40,10 @@ import { TICK_DT, simulateOffline, tick } from '../sim/game';
 import { batteryCapacityMWh, cityDemandRangeMW, disposeRate, dumpCapacityMW, incineratorNominalMW, lineCapacityMW, prestige, solarCapacityMW, storageCapacity } from '../sim/power';
 import { questProgress } from '../sim/quests';
 import { deserialize, serialize } from '../sim/save';
+import { buildingCost, buyParcel, canPlace, demolishAt, parcelCost, parcelsBought, placeBuilding, purchasableParcels, type PlaceReason } from '../sim/build';
 import { collectLitter } from '../sim/litter';
+import { isBuildableTile, isUnlockedTile, parcelIndex } from '../sim/mapdata';
+import { buildingDef, footprint, networkInfo } from '../sim/network';
 import { checkStory, storyText } from '../sim/story';
 import { createMap } from './map';
 import { newGame } from '../sim/state';
@@ -87,12 +94,14 @@ app.innerHTML = `
       <button class="stat" data-stat="vo"><b id="vo"></b><small id="vops"></small></button>
     </div>
     <div id="clock"></div>
+    <div id="modebar"></div>
     <div id="statdetail"></div>
     <div id="alerts"></div>
   </div>
 
   <nav id="tabs">
     <button class="tab" data-tab="furnace" aria-label="Spalovna">🏭</button>
+    <button class="tab" data-tab="build" aria-label="Stavba">🏗️</button>
     <button class="tab" data-tab="upgrades" aria-label="Vylepšení">🛠️</button>
     <button class="tab" data-tab="quests" aria-label="Úkoly">📋</button>
     <button class="tab" data-tab="net" aria-label="Síť">🔌</button>
@@ -113,6 +122,9 @@ app.innerHTML = `
         </div>
         <div id="waste"></div>
         <div id="incupgrades"></div>
+      </div>
+      <div data-sheet="build" hidden>
+        <div id="buildmenu"></div>
       </div>
       <div data-sheet="upgrades" hidden>
         <div id="upgrades"></div>
@@ -259,9 +271,125 @@ runOffline(); // po načtení hry dopočítat čas, kdy hráč nehrál
 
 const $ = (id: string) => document.getElementById(id)!;
 
+// ---- Stavění: režimy (stavět / zbourat / koupit parcelu), menu a klepnutí na mapu ----
+type Mode = { kind: 'none' } | { kind: 'build'; type: BuildingType } | { kind: 'demolish' } | { kind: 'parcel' };
+let mode: Mode = { kind: 'none' };
+const BUILD_MESSAGES: Record<Exclude<PlaceReason, 'ok'>, string> = {
+  chapter: 'Tohle se dá stavět až v pozdější kapitole.',
+  locked: 'Tohle území je zamčené (v mlze). Dokup parcelu.',
+  terrain: 'Tady se stavět nedá (voda, hory, keř, skála nebo jiná stavba).',
+  occupied: 'Tady už něco stojí.',
+  cost: 'Nemáš dost kreditů.',
+};
+function buildToast(html: string): void {
+  document.querySelectorAll('.toast-build').forEach((e) => e.remove()); // ať se hlášky nehromadí
+  showToast(html);
+  toasts.lastElementChild?.classList.add('toast-build');
+}
+function setMode(m: Mode): void {
+  mode = m;
+  lastModebar = '';
+  lastBuildHtml = '';
+}
+let lastBuildHtml = '';
+let lastModebar = '';
+
+function renderBuildMenu(): void {
+  const s = state;
+  const info = networkInfo(s);
+  const unconnected = info.connected.filter((c) => !c).length;
+  const rows = BUILDINGS.map((d) => {
+    if (s.chapter < d.unlockChapter) return `<div class="bld locked">🔒 <b>${d.name}</b><small>Odemkne se v kapitole ${d.unlockChapter}.</small></div>`;
+    const cost = buildingCost(s, d.type);
+    const poor = s.credits < cost;
+    const sel = mode.kind === 'build' && mode.type === d.type;
+    return `<button class="bld${sel ? ' sel' : ''}" data-build="${d.type}"><span class="bld-ico">${d.emoji}</span><span class="bld-txt"><b>${d.name} (${d.w}×${d.h})</b><small>${d.description}</small></span><span class="bld-cost${poor ? ' poor' : ''}">💰 ${cost}</span></button>`;
+  }).join('');
+  const parcelOpen = s.chapter >= PARCEL_UNLOCK_CHAPTER;
+  const parcelBtn = parcelOpen
+    ? `<button class="bld${mode.kind === 'parcel' ? ' sel' : ''}" data-mode="parcel"><span class="bld-ico">🗺️</span><span class="bld-txt"><b>Dokoupit území (parcela 4×4)</b><small>Klepni na zamlžený kus země vedle odemčeného. Dokoupeno: ${parcelsBought(s)}.</small></span><span class="bld-cost${s.credits < parcelCost(s) ? ' poor' : ''}">💰 ${parcelCost(s)}</span></button>`
+    : `<div class="bld locked">🔒 <b>Dokoupit území</b><small>Odemkne se v kapitole ${PARCEL_UNLOCK_CHAPTER}.</small></div>`;
+  const demo = `<button class="bld${mode.kind === 'demolish' ? ' sel' : ''}" data-mode="demolish"><span class="bld-ico">🧹</span><span class="bld-txt"><b>Zbourat budovu</b><small>Klepni na budovu na mapě. Vrátí se ${Math.round(BUILDING_REFUND * 100)} % ceny.</small></span></button>`;
+  const status = `<small class="bld-status">Postaveno: ${s.buildings.length}${unconnected > 0 ? ` · ⚠️ nenapojených: ${unconnected}` : ''}</small>`;
+  const html = `${status}${rows}${parcelBtn}${demo}`;
+  if (html !== lastBuildHtml) {
+    $('buildmenu').innerHTML = html;
+    lastBuildHtml = html;
+  }
+}
+
+function renderModebar(): void {
+  let html = '';
+  if (mode.kind === 'build') {
+    const d = buildingDef(mode.type);
+    html = `🏗️ Stavím: <b>${d.name}</b> · 💰 ${buildingCost(state, mode.type)} · klepni na mapu <button class="modeoff">✕ Hotovo</button>`;
+  } else if (mode.kind === 'demolish') html = `🧹 Bourání: klepni na budovu <button class="modeoff">✕ Hotovo</button>`;
+  else if (mode.kind === 'parcel') html = `🗺️ Koupě území: klepni na zlatě ohraničenou parcelu · 💰 ${parcelCost(state)} <button class="modeoff">✕ Hotovo</button>`;
+  if (html !== lastModebar) {
+    $('modebar').innerHTML = html;
+    $('modebar').style.display = html ? 'block' : 'none';
+    lastModebar = html;
+  }
+}
+
+$('buildmenu').addEventListener('click', (e) => {
+  const el = (e.target as HTMLElement).closest<HTMLElement>('[data-build],[data-mode]');
+  if (!el) return;
+  if (el.dataset.build) setMode({ kind: 'build', type: el.dataset.build as BuildingType });
+  else if (el.dataset.mode === 'demolish') setMode({ kind: 'demolish' });
+  else if (el.dataset.mode === 'parcel') setMode({ kind: 'parcel' });
+  showTab(''); // menu se zavře, ať je vidět mapa
+});
+$('modebar').addEventListener('click', (e) => {
+  if ((e.target as HTMLElement).closest('.modeoff')) setMode({ kind: 'none' });
+});
+
+function confirmDialog(text: string, yes: string, onYes: () => void): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal good"><h3>🗺️ Koupě území</h3><p>${text}</p><button class="modal-ok" data-yes>${yes}</button><button class="modal-cancel" data-no>Zrušit</button></div>`;
+  overlay.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-yes]')) {
+      overlay.remove();
+      onYes();
+    } else if (target.closest('[data-no]') || target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+
+// Klepnutí na dlaždici mapy: v režimu stavění ho zpracuje stavba, jinak se klepnutí nechá na třídění odpadu (vrací false)
+function onTileTap(x: number, y: number): boolean {
+  if (mode.kind === 'build') {
+    const r = placeBuilding(state, mode.type, x, y);
+    if (r !== 'ok') buildToast(`🏗️ ${BUILD_MESSAGES[r]}${r === 'cost' ? ` (cena ${buildingCost(state, mode.type)})` : ''}`);
+    return true;
+  }
+  if (mode.kind === 'demolish') {
+    const r = demolishAt(state, x, y);
+    buildToast(r ? `🧹 Zbouráno: ${buildingDef(r.type).name}. Vráceno 💰 ${r.refund}.` : '🧹 Tady nic nestojí.');
+    return true;
+  }
+  if (mode.kind === 'parcel') {
+    const idx = parcelIndex(x, y);
+    if (!purchasableParcels(state).includes(idx)) {
+      buildToast(isUnlockedTile(state.unlockedParcels, x, y) ? '🗺️ Tohle území už máš.' : '🗺️ Tuhle parcelu koupit nejde (musí sousedit s odemčeným územím a mít pevninu).');
+      return true;
+    }
+    const cost = parcelCost(state);
+    confirmDialog(`Dokoupit parcelu za <b>💰 ${cost}</b>? Odemkne se nové území pro stavění a uklízení.`, `Koupit za ${cost}`, () => {
+      const r = buyParcel(state, idx);
+      buildToast(r === 'ok' ? '🗺️ Parcela koupena! Mlha zmizí a můžeš tu stavět.' : r === 'cost' ? '🗺️ Nemáš dost kreditů.' : '🗺️ Tuhle parcelu koupit nejde.');
+    });
+    return true;
+  }
+  return false;
+}
+
 // Záložky na boku: klepnutí otevře menu přes mapu, další klepnutí (nebo ✕) ho zavře
 const TAB_TITLES: Record<string, string> = {
   furnace: '🏭 Spalovna',
+  build: '🏗️ Stavba',
   upgrades: '🛠️ Vylepšení',
   quests: '📋 Úkoly',
   net: '🔌 Síť',
@@ -317,6 +445,8 @@ $('debug').appendChild(resetBtn);
 $('bonus').addEventListener('click', () => (state.credits += DEBUG_CREDITS_BONUS));
 
 function render(): void {
+  renderBuildMenu();
+  renderModebar();
   const s = state;
   const l = s.live;
   $('credits').textContent = `💰 ${Math.floor(s.credits)}`;
@@ -520,7 +650,17 @@ createMap($('map'), () => ({
   solarCapMW: solarCapacityMW(state),
   litter: state.litter,
   unlocked: state.unlockedParcels,
-}), (x, y) => collectLitter(state, x, y));
+  buildings: state.buildings.map((b, i) => {
+    const d = buildingDef(b.type);
+    return { type: b.type, x: b.x, y: b.y, w: d.w, h: d.h, emoji: d.emoji, color: d.color, connected: networkInfo(state).connected[i] ?? true };
+  }),
+  mode: mode.kind,
+  ghost: mode.kind === 'build' ? { w: buildingDef(mode.type).w, h: buildingDef(mode.type).h, valid: (x: number, y: number) => canPlace(state, (mode as { type: BuildingType }).type, x, y) === 'ok' } : null,
+  freeTile: (x: number, y: number) =>
+    isUnlockedTile(state.unlockedParcels, x, y) && isBuildableTile(x, y) && !state.buildings.some((b) => footprint(b).some((t) => t.x === x && t.y === y)),
+  purchasable: purchasableParcels(state),
+  parcelCost: parcelCost(state),
+}), (x, y) => collectLitter(state, x, y), onTileTap);
 
 // Herní smyčka: simulace v pevných tících, vykreslení hladce
 let last = performance.now();

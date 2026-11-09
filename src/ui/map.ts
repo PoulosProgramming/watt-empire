@@ -41,7 +41,15 @@ export interface MapView {
   solarCapMW: number; // nejvyšší výkon panelů
   litter: { x: number; y: number; left: number }[]; // odpad rozsetý po mapě
   unlocked: number[]; // odemčené parcely (zbytek je v mlze)
+  buildings: { type: string; x: number; y: number; w: number; h: number; emoji: string; color: number; connected: boolean }[];
+  mode: 'none' | 'build' | 'demolish' | 'parcel'; // co hráč zrovna dělá (stavění, bourání, koupě parcel)
+  ghost: { w: number; h: number; valid: (x: number, y: number) => boolean } | null; // náhled budovy pod prstem/myší
+  freeTile: (x: number, y: number) => boolean; // dlaždice, kam jde stavět (pro zvýraznění)
+  purchasable: number[]; // parcely, které jde koupit
+  parcelCost: number; // cena další parcely
 }
+// Klepnutí na dlaždici: vrací true, když ho zpracovala stavba (pak se klepnutí na odpad už neřeší)
+export type TileTapFn = (x: number, y: number) => boolean;
 
 // Výsledek klepnutí na odpad (null = nic tam nebylo)
 export type CollectFn = (x: number, y: number) => { removed: boolean; left: number } | null;
@@ -99,6 +107,13 @@ class MapScene extends Phaser.Scene {
   private cy = 0;
   private held = false; // prst nebo myš je dole
   private fog!: Phaser.GameObjects.Graphics;
+  private hints!: Phaser.GameObjects.Graphics; // zvýraznění volných dlaždic a parcel k nákupu
+  private hintKey = '';
+  private ghostGfx!: Phaser.GameObjects.Graphics;
+  private parcelLabels: Phaser.GameObjects.Text[] = [];
+  private hover: { x: number; y: number } | null = null;
+  private onTileTap!: TileTapFn;
+  private buildObjs = new Map<string, { box: Phaser.GameObjects.Container; warn: Phaser.GameObjects.Text | null; w: number }>();
   private fogKey = '';
   private bounds = { x0: 0, y0: 0, x1: MAP_GRID_SIZE, y1: MAP_GRID_SIZE };
 
@@ -106,9 +121,10 @@ class MapScene extends Phaser.Scene {
     super('map');
   }
 
-  init(data: { getView: () => MapView; onCollect: CollectFn; nightEl: HTMLElement; dpr: number }): void {
+  init(data: { getView: () => MapView; onCollect: CollectFn; onTileTap: TileTapFn; nightEl: HTMLElement; dpr: number }): void {
     this.getView = data.getView;
     this.onCollect = data.onCollect;
+    this.onTileTap = data.onTileTap;
     this.nightEl = data.nightEl;
     this.dpr = data.dpr;
   }
@@ -118,6 +134,8 @@ class MapScene extends Phaser.Scene {
     this.wire = this.add.graphics();
     this.drawBuildings();
     this.fog = this.add.graphics().setDepth(8);
+    this.hints = this.add.graphics().setDepth(7);
+    this.ghostGfx = this.add.graphics().setDepth(9);
 
     const cam = this.cameras.main;
     this.applyMinZoom();
@@ -333,6 +351,10 @@ class MapScene extends Phaser.Scene {
       this.held = false;
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (!p.isDown) {
+        const w = cam.getWorldPoint(p.x, p.y);
+        this.hover = { x: Math.floor(w.x / T), y: Math.floor(w.y / T) };
+      }
       if (this.pinching || !p.isDown) return;
       if (!this.dragging) {
         const moved = Phaser.Math.Distance.Between(p.x, p.y, p.downX, p.downY);
@@ -359,6 +381,7 @@ class MapScene extends Phaser.Scene {
   private tapAt(p: Phaser.Input.Pointer): void {
     const cam = this.cameras.main;
     const w = cam.getWorldPoint(p.x, p.y);
+    if (this.onTileTap(Math.floor(w.x / T), Math.floor(w.y / T))) return; // stavění / bourání / koupě parcely
     let best: { x: number; y: number; left: number } | null = null;
     let bestD = T * 0.9;
     for (const l of this.lastLitter) {
@@ -426,6 +449,89 @@ class MapScene extends Phaser.Scene {
         ease: 'Cubic.Out',
         onComplete: () => dot.destroy(),
       });
+    }
+  }
+
+  // Budovy hráče: čtverec v barvě budovy s ikonou; nenapojené jsou průhlednější a mají ⚠️
+  private syncBuildings(list: MapView['buildings']): void {
+    const seen = new Set<string>();
+    for (const b of list) {
+      const key = `${b.type},${b.x},${b.y}`;
+      seen.add(key);
+      let obj = this.buildObjs.get(key);
+      if (!obj) {
+        const rect = this.add.rectangle(1, 1, b.w * T - 2, b.h * T - 2, b.color).setOrigin(0).setStrokeStyle(2, 0x000000, 0.55);
+        const parts: Phaser.GameObjects.GameObject[] = [rect];
+        if (b.w >= 2) {
+          parts.push(
+            this.add
+              .text((b.w * T) / 2, (b.h * T) / 2, b.emoji, { fontFamily: 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif', fontSize: `${T * b.w * 0.55}px` })
+              .setOrigin(0.5)
+              .setResolution(Math.min(8, MAP_ZOOM_MAX * this.dpr)),
+          );
+        }
+        let warn: Phaser.GameObjects.Text | null = null;
+        if (b.w >= 2) {
+          warn = this.add
+            .text(T * 0.2, T * 0.1, '⚠️', { fontFamily: 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif', fontSize: `${T * 0.7}px` })
+            .setResolution(Math.min(8, MAP_ZOOM_MAX * this.dpr));
+          parts.push(warn);
+        }
+        const box = this.add.container(b.x * T, b.y * T, parts).setDepth(4);
+        obj = { box, warn, w: b.w };
+        this.buildObjs.set(key, obj);
+        this.tweens.add({ targets: box, scale: { from: 0.6, to: 1 }, duration: 180, ease: 'Back.Out' });
+      }
+      obj.box.setAlpha(b.connected ? 1 : 0.5);
+      obj.warn?.setVisible(!b.connected);
+    }
+    for (const [key, obj] of this.buildObjs) {
+      if (!seen.has(key)) {
+        this.buildObjs.delete(key);
+        obj.box.destroy();
+      }
+    }
+  }
+
+  // Zvýraznění: v režimu stavění zeleně volné dlaždice, v režimu koupě zlatě parcely k nákupu (s cenou)
+  private drawHints(v: MapView, factor: number, labelScale: number): void {
+    const key = [v.mode, v.unlocked.join(','), v.buildings.length, v.purchasable.join(','), v.parcelCost].join('|');
+    if (key !== this.hintKey) {
+      this.hintKey = key;
+      this.hints.clear();
+      if (v.mode === 'build') {
+        this.hints.fillStyle(0x4ade80, 0.22);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (v.freeTile(x, y)) this.hints.fillRect(x * T + 1, y * T + 1, T - 2, T - 2);
+      } else if (v.mode === 'parcel') {
+        this.hints.lineStyle(4, 0xfbbf24, 1);
+        this.hints.fillStyle(0xfbbf24, 0.12);
+        for (const i of v.purchasable) {
+          const o = parcelOrigin(i);
+          this.hints.fillRect(o.x * T, o.y * T, PARCEL_SIZE * T, PARCEL_SIZE * T);
+          this.hints.strokeRect(o.x * T + 2, o.y * T + 2, PARCEL_SIZE * T - 4, PARCEL_SIZE * T - 4);
+        }
+      }
+    }
+    // popisky s cenou parcel
+    const showParcels = v.mode === 'parcel';
+    while (this.parcelLabels.length < v.purchasable.length) this.parcelLabels.push(this.label().setOrigin(0.5).setVisible(false));
+    this.parcelLabels.forEach((l, i) => {
+      const idx = v.purchasable[i];
+      if (!showParcels || idx === undefined) {
+        l.setVisible(false);
+        return;
+      }
+      const o = parcelOrigin(idx);
+      l.setVisible(true).setText(`💰 ${v.parcelCost}`).setScale(labelScale).setPosition((o.x + PARCEL_SIZE / 2) * T, (o.y + PARCEL_SIZE / 2) * T);
+    });
+    void factor;
+
+    // náhled budovy pod myší (na PC): zelený = jde postavit, červený = ne
+    this.ghostGfx.clear();
+    if (v.mode === 'build' && v.ghost && this.hover) {
+      const ok = v.ghost.valid(this.hover.x, this.hover.y);
+      this.ghostGfx.fillStyle(ok ? 0x22c55e : 0xef4444, 0.45);
+      this.ghostGfx.fillRect(this.hover.x * T, this.hover.y * T, v.ghost.w * T, v.ghost.h * T);
     }
   }
 
@@ -518,6 +624,9 @@ class MapScene extends Phaser.Scene {
     this.wireLabel.setVisible(factor >= 0.75);
 
     this.syncLitter(v.litter);
+    this.syncBuildings(v.buildings);
+
+    this.drawHints(v, factor, labelScale);
 
     // Noc: tmavý závoj (HTML vrstva nad mapou, jen vizuálně)
     this.nightEl.style.opacity = v.isNight ? '1' : '0';
@@ -568,7 +677,7 @@ class MapScene extends Phaser.Scene {
   }
 }
 
-export function createMap(parent: HTMLElement, getView: () => MapView, onCollect: CollectFn): Phaser.Game {
+export function createMap(parent: HTMLElement, getView: () => MapView, onCollect: CollectFn, onTileTap: TileTapFn): Phaser.Game {
   // Ostrý obraz na displejích s vysokým rozlišením: plátno má fyzické pixely a CSS ho zmenší
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const nightEl = document.createElement('div');
@@ -589,7 +698,7 @@ export function createMap(parent: HTMLElement, getView: () => MapView, onCollect
     input: { touch: true, mouse: true },
     callbacks: {
       postBoot: (g) => {
-        g.scene.add('map', MapScene, true, { getView, onCollect, nightEl, dpr });
+        g.scene.add('map', MapScene, true, { getView, onCollect, onTileTap, nightEl, dpr });
       },
     },
   });

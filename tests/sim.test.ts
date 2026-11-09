@@ -4,6 +4,10 @@ import { addVO, buyUpgrade, isUnlocked, tap, upgradeCost, voStorageMax } from '.
 import { TICK_DT, simulateOffline, tick } from '../src/sim/game';
 import { solarMW } from '../src/sim/power';
 import { runCrisis } from '../src/sim/quests';
+import { buildingCost, buyParcel, canPlace, demolishAt, parcelCost, placeBuilding, purchasableParcels } from '../src/sim/build';
+import { connectedCount, networkInfo } from '../src/sim/network';
+import { ROAD_PRICE_BONUS_MAX, ROAD_PRICE_BONUS_PER_TILE, BUILDING_REFUND, PARCEL_BASE_COST, PARCEL_GROWTH } from '../src/sim/balance';
+import { roadPriceBonus, storageCapacity, disposeRate, batteryCapacityMWh } from '../src/sim/power';
 import { checkStory, storyText } from '../src/sim/story';
 import { collectLitter, initLitter, runLitter, spawnLitter } from '../src/sim/litter';
 import { coastX, isBuildableTile, isLitterTile, isUnlockedTile, mountainY, obstacleAt, parcelIndex, terrainAt, unlockedBounds } from '../src/sim/mapdata';
@@ -50,6 +54,21 @@ describe('ekonomika', () => {
   });
 });
 
+
+// Pomocná funkce pro testy: postaví (bez ceny) napojené budovy vedle spalovny. Sklad a likvidátor sousedí se spalovnou
+// (odvoz odpadu), baterie sousedí se spalovnou, která je součástí sítě.
+const NEXT_TO_INCINERATOR = [
+  { x: 9, y: 11 },
+  { x: 10, y: 9 },
+  { x: 11, y: 13 },
+];
+const built = (s: ReturnType<typeof newGame>, type: 'storage' | 'disposer' | 'battery', n: number) => {
+  for (let i = 0; i < n; i++) {
+    const spot = NEXT_TO_INCINERATOR[s.buildings.length];
+    s.buildings.push({ type, x: spot.x, y: spot.y });
+  }
+  s.buildVersion += 1;
+};
 
 // Polední špička ze slunce (kapitola 3) je jediné, co teď přetěžuje síť: 10 MW ze slunce na vedení 6 MW.
 const solarPeak = () => {
@@ -105,7 +124,7 @@ describe('síť', () => {
 
   it('baterie uloží přebytek ze slunce a síť nevypadne', () => {
     const s = solarPeak();
-    s.upgrades.battery = 5;
+    built(s, 'battery', 3);
     for (let i = 0; i < 4 / TICK_DT; i++) {
       s.hour = 12;
       tick(s);
@@ -137,7 +156,7 @@ describe('spalovna', () => {
 
   it('s pomalým přítokem VO výkon nekmitá, jen jednou zhasne a čeká', () => {
     const s = newGame();
-    s.upgrades.battery = 10;
+    built(s, 'battery', 3);
     s.credits = 0;
     let changes = 0;
     let prev = false;
@@ -287,16 +306,14 @@ describe('odemykání', () => {
     expect(buyUpgrade(s, 'worker')).toBe(true);
   });
 
-  it('mařič a baterie se odemknou až v kapitole 3, regulátor v kapitole 4', () => {
+  it('mařič se odemkne až v kapitole 3, regulátor v kapitole 4', () => {
     const s = newGame();
     s.upgrades.power = 12;
     s.delivered = 5000;
     expect(isUnlocked(s, 'dump')).toBe(false);
-    expect(isUnlocked(s, 'battery')).toBe(false);
     expect(isUnlocked(s, 'regulator')).toBe(false);
     s.chapter = 3;
     expect(isUnlocked(s, 'dump')).toBe(true);
-    expect(isUnlocked(s, 'battery')).toBe(true);
     expect(isUnlocked(s, 'regulator')).toBe(false);
     s.chapter = 4;
     expect(isUnlocked(s, 'regulator')).toBe(true);
@@ -527,7 +544,7 @@ describe('pořadí úkolů', () => {
 
   it('mařič a baterie už nejsou v hlavním řetězci kapitoly 1', () => {
     const main = QUESTS.filter((q) => !q.ongoing && (q.chapter ?? 1) === 1);
-    expect(main.some((q) => q.upgrade === 'dump' || q.upgrade === 'battery')).toBe(false);
+    expect(main.some((q) => q.upgrade === 'dump' || q.building === 'battery')).toBe(false);
   });
 
   it('každý úkol na vylepšení má dosažitelnou úroveň', () => {
@@ -557,7 +574,7 @@ describe('postup kapitol', () => {
 
   it('úkoly pozdějších kapitol se nesplní předčasně', () => {
     const s = newGame();
-    s.upgrades.cleanup = 3; // splňuje úkoly kapitoly 2, ale jsme v kapitole 1
+    built(s, 'disposer', 3); // splňuje úkoly kapitoly 2, ale jsme v kapitole 1
     tick(s);
     expect(s.doneQuests).not.toContain('c2_cleanup');
     s.chapter = 2;
@@ -587,7 +604,7 @@ describe('kapitola 2: odpad', () => {
 
   it('po krizi ze spalovny vzniká odpad: nejdřív do skladu, co se nevejde, leží na poli', () => {
     const s = ch2();
-    s.upgrades.storage = 1; // 150 j.
+    built(s, 'storage', 1); // 150 j.
     run(s, 30);
     expect(s.toxicStored).toBeGreaterThan(0);
     run(s, 300);
@@ -617,7 +634,7 @@ describe('kapitola 2: odpad', () => {
   it('likvidátor ničí odpad z pole, stojí peníze a nikdy nejde do mínusu', () => {
     const s = ch2();
     s.toxicField = 100;
-    s.upgrades.cleanup = 2; // 1 j/s
+    built(s, 'disposer', 2); // 1 j/s
     run(s, 10);
     expect(s.toxicDisposed).toBeGreaterThan(5);
     expect(s.live.disposeCostPerSecond).toBeGreaterThan(0);
@@ -635,7 +652,7 @@ describe('kapitola 2: odpad', () => {
     const s = ch2();
     s.doneQuests = QUESTS.map((q) => q.id).filter((id) => id !== 'c2_field');
     s.toxicField = 5;
-    s.upgrades.cleanup = 8;
+    built(s, 'disposer', 3);
     s.incineratorOn = false; // ať nové odpadky nevznikají
     tick(s);
     expect(s.doneQuests).not.toContain('c2_field');
@@ -1091,5 +1108,198 @@ describe('mapa: terén a parcely', () => {
     const s = deserialize(old)!;
     expect(s.litter.some((l) => l.x === 1 && l.y === 1)).toBe(false);
     expect(s.litter.some((l) => l.x === 31 && l.y === 31)).toBe(false); // zamčená parcela
+  });
+});
+
+describe('stavění budov', () => {
+  // hráč v kapitole 3 s dostatkem peněz, aby šlo stavět všechno
+  const rich = () => {
+    const s = newGame();
+    s.chapter = 3;
+    s.credits = 1e9;
+    return s;
+  };
+
+  it('všechna místa vedle spalovny, která testy používají, jsou volná pevnina', () => {
+    for (const spot of NEXT_TO_INCINERATOR) {
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) expect(isBuildableTile(spot.x + dx, spot.y + dy)).toBe(true);
+    }
+  });
+
+  it('cena budovy roste s počtem už postavených téhož druhu (cesty zůstávají levné)', () => {
+    const s = rich();
+    expect(buildingCost(s, 'storage')).toBe(1500);
+    expect(placeBuilding(s, 'storage', 9, 11)).toBe('ok');
+    expect(buildingCost(s, 'storage')).toBe(2250); // ×1,5
+    expect(buildingCost(s, 'road')).toBe(15);
+    placeBuilding(s, 'road', 10, 13);
+    expect(buildingCost(s, 'road')).toBe(15); // cesty nezdražují
+  });
+
+  it('stavba se strhne z peněz, nikdy do mínusu', () => {
+    const s = rich();
+    s.credits = 1000; // sklad stojí 1500
+    expect(placeBuilding(s, 'storage', 9, 11)).toBe('cost');
+    expect(s.credits).toBe(1000);
+    expect(s.buildings.length).toBe(0);
+  });
+
+  it('nejde stavět před odemčenou kapitolou, v mlze, na překážkách ani přes jinou budovu', () => {
+    const s = rich();
+    s.chapter = 1;
+    expect(placeBuilding(s, 'road', 10, 13)).toBe('chapter');
+    s.chapter = 3;
+    expect(placeBuilding(s, 'road', 0, 0)).toBe('locked'); // v mlze
+    expect(placeBuilding(s, 'road', 11, 11)).toBe('terrain'); // pod spalovnou
+    expect(placeBuilding(s, 'storage', 9, 11)).toBe('ok');
+    expect(placeBuilding(s, 'road', 10, 12)).toBe('occupied'); // už tam stojí sklad
+    expect(canPlace(s, 'road', 14, 12)).toBe('terrain'); // dráty hlavního vedení
+  });
+
+  it('sklad vedle spalovny je napojený (odvoz odpadu), daleko bez cesty ne', () => {
+    const s = rich();
+    placeBuilding(s, 'storage', 9, 11); // vedle spalovny
+    placeBuilding(s, 'storage', 16, 9); // daleko od spalovny
+    expect(networkInfo(s).connected).toEqual([true, false]);
+    expect(connectedCount(s, 'storage')).toBe(1);
+    expect(storageCapacity(s)).toBe(150);
+  });
+
+  it('cesta od spalovny napojí vzdálený sklad, přerušená cesta ne', () => {
+    const s = rich();
+    // cesta od spalovny doprava nahoru: (13,11) sousedí se spalovnou (12,11)
+    for (const [x, y] of [[13, 11], [14, 11], [15, 11], [16, 11]]) expect(placeBuilding(s, 'road', x, y)).toBe('ok');
+    expect(placeBuilding(s, 'disposer', 17, 10)).toBe('ok'); // sousedí s koncem cesty (16,11)
+    expect(connectedCount(s, 'disposer')).toBe(1);
+    expect(disposeRate(s)).toBeCloseTo(0.5, 5);
+    // zbourat prostřední dlaždici cesty: likvidátor se odpojí
+    demolishAt(s, 15, 11);
+    expect(connectedCount(s, 'disposer')).toBe(0);
+    expect(connectedCount(s, 'road')).toBe(2); // jen (13,11) a (14,11) jsou napojené, zbytek ne
+  });
+
+  it('baterie vedle hlavního vedení je napojená na síť, osamělá ne', () => {
+    const s = rich();
+    expect(placeBuilding(s, 'battery', 15, 13)).toBe('ok'); // sousedí s hlavním vedením (y=12)
+    expect(placeBuilding(s, 'battery', 9, 18)).toBe('ok'); // osamělá
+    expect(networkInfo(s).connected).toEqual([true, false]);
+    expect(batteryCapacityMWh(s)).toBe(10);
+  });
+
+  it('drát propojí vzdálenou baterii se sítí', () => {
+    const s = rich();
+    expect(placeBuilding(s, 'battery', 13, 16)).toBe('ok');
+    expect(connectedCount(s, 'battery')).toBe(0);
+    // drát od hlavního vedení (15,12) dolů a doleva k baterii (dotýká se jí zhora)
+    for (const [x, y] of [[15, 13], [15, 14], [15, 15], [14, 15]]) expect(placeBuilding(s, 'wire', x, y)).toBe('ok');
+    expect(connectedCount(s, 'battery')).toBe(1);
+    expect(connectedCount(s, 'wire')).toBe(4);
+  });
+
+  it('zbourání vrátí polovinu ceny', () => {
+    const s = rich();
+    s.credits = 5000;
+    placeBuilding(s, 'storage', 9, 11);
+    const after = s.credits;
+    const r = demolishAt(s, 10, 12)!; // libovolná dlaždice budovy
+    expect(r.type).toBe('storage');
+    expect(r.refund).toBe(Math.floor(1500 * BUILDING_REFUND));
+    expect(s.credits).toBe(after + r.refund);
+    expect(s.buildings.length).toBe(0);
+    expect(demolishAt(s, 10, 12)).toBeNull();
+  });
+
+  it('napojené cesty zvedají cenu energie, nejvýš o 10 %', () => {
+    const s = rich();
+    expect(roadPriceBonus(s)).toBe(0);
+    placeBuilding(s, 'road', 13, 11);
+    placeBuilding(s, 'road', 14, 11);
+    expect(roadPriceBonus(s)).toBeCloseTo(2 * ROAD_PRICE_BONUS_PER_TILE, 5);
+    for (let i = 0; i < 40; i++) s.buildings.push({ type: 'road', x: 13, y: 11 }); // mnoho napojených cest
+    s.buildVersion += 1;
+    expect(roadPriceBonus(s)).toBeCloseTo(ROAD_PRICE_BONUS_MAX, 5);
+  });
+
+  it('úkoly na budovy se splní, jen když jsou napojené (nepřipojená budova se nepočítá)', () => {
+    const s = rich();
+    s.chapter = 2;
+    placeBuilding(s, 'disposer', 16, 9); // daleko, nenapojený
+    tick(s);
+    expect(s.doneQuests).not.toContain('c2_cleanup');
+    placeBuilding(s, 'disposer', 9, 11); // vedle spalovny
+    tick(s);
+    expect(s.doneQuests).toContain('c2_cleanup');
+  });
+
+  it('staré uložení s číselnými vylepšeními (sklad, likvidátor, baterie) se převede a vrátí peníze', () => {
+    const old = JSON.stringify({ v: 1, state: { credits: 10, upgrades: { storage: 2, cleanup: 1, battery: 1, worker: 3 } } });
+    const s = deserialize(old)!;
+    expect(s.upgrades.worker).toBe(3);
+    expect((s.upgrades as unknown as Record<string, number>).storage).toBeUndefined();
+    // 10 + (1500 + 2250) + 2000 + 900
+    expect(s.credits).toBe(10 + 1500 + 2250 + 2000 + 900);
+  });
+});
+
+describe('dokupování parcel', () => {
+  it('v kapitole 1 se parcely koupit nedají, od kapitoly 2 ano', () => {
+    const s = newGame();
+    expect(purchasableParcels(s)).toEqual([]);
+    s.chapter = 2;
+    expect(purchasableParcels(s).length).toBeGreaterThan(0);
+  });
+
+  it('koupit jde jen sousední parcela s pevninou, ne hory ani moře', () => {
+    const s = newGame();
+    s.chapter = 2;
+    const ok = purchasableParcels(s);
+    for (const i of ok) expect(s.unlockedParcels).not.toContain(i);
+    expect(ok).not.toContain(0); // parcela 0 (hory a moře nahoře vlevo) neleží vedle odemčeného území
+    expect(ok.length).toBeLessThanOrEqual(12);
+  });
+
+  it('každá další parcela je dražší, peníze se strhnou a mlha zmizí', () => {
+    const s = newGame();
+    s.chapter = 2;
+    s.credits = 1e9;
+    expect(parcelCost(s)).toBe(PARCEL_BASE_COST);
+    const first = purchasableParcels(s)[0];
+    const before = s.credits;
+    expect(buyParcel(s, first)).toBe('ok');
+    expect(s.credits).toBe(before - PARCEL_BASE_COST);
+    expect(s.unlockedParcels).toContain(first);
+    expect(parcelCost(s)).toBe(Math.ceil(PARCEL_BASE_COST * PARCEL_GROWTH));
+    expect(buyParcel(s, first)).toBe('not-available'); // už je naše
+  });
+
+  it('bez peněz parcelu nekoupíš a nikdy nejdeš do mínusu', () => {
+    const s = newGame();
+    s.chapter = 2;
+    s.credits = 100;
+    expect(buyParcel(s, purchasableParcels(s)[0])).toBe('cost');
+    expect(s.credits).toBe(100);
+  });
+
+  it('úkol "dokup první parcelu" se splní', () => {
+    const s = newGame();
+    s.chapter = 2;
+    s.credits = 1e9;
+    buyParcel(s, purchasableParcels(s)[0]);
+    tick(s);
+    expect(s.doneQuests).toContain('c2_parcel');
+  });
+
+  it('na dokoupené parcele jde stavět', () => {
+    const s = newGame();
+    s.chapter = 3;
+    s.credits = 1e9;
+    const idx = purchasableParcels({ ...s, chapter: 2 } as typeof s)[0];
+    buyParcel({ ...s, chapter: 2, credits: 1e9, unlockedParcels: s.unlockedParcels } as typeof s, idx);
+    s.unlockedParcels.push(idx);
+    const o = { x: (idx % 8) * 4, y: Math.floor(idx / 8) * 4 };
+    // v nově odemčené parcele najdi volné místo pro cestu
+    let placed = false;
+    for (let dy = 0; dy < 4 && !placed; dy++) for (let dx = 0; dx < 4 && !placed; dx++) placed = placeBuilding(s, 'road', o.x + dx, o.y + dy) === 'ok';
+    expect(placed).toBe(true);
   });
 });

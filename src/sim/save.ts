@@ -1,4 +1,4 @@
-import { TOXIC_TRIGGER_CHAPTER } from './balance';
+import { LEGACY_UPGRADE_COSTS, TOXIC_TRIGGER_CHAPTER } from './balance';
 import { isLitterTile } from './mapdata';
 import { newGame, type GameState } from './state';
 
@@ -29,6 +29,13 @@ export function deserialize(text: string | null): GameState | null {
     if (loaded.chapter < TOXIC_TRIGGER_CHAPTER) {
       loaded.toxic = false;
       loaded.toxicCountdown = -1;
+    }
+    // Sklad, likvidátor a baterie jsou teď budovy na mapě: staré vylepšení se zruší a peníze se vrátí
+    const legacy = loaded.upgrades as unknown as Record<string, number>;
+    for (const [name, c] of Object.entries(LEGACY_UPGRADE_COSTS)) {
+      const level = Number(legacy[name] ?? 0);
+      for (let k = 0; k < level; k++) loaded.credits += Math.ceil(c.baseCost * Math.pow(c.growth, k));
+      delete legacy[name];
     }
     // Mapa se zvětšila a dostala terén: odpad na dlaždicích, kde už ležet nesmí, se zahodí (nový se dosype sám)
     loaded.litter = loaded.litter.filter((l) => isLitterTile(loaded.unlockedParcels, l.x, l.y));

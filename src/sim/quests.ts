@@ -3,6 +3,7 @@ import {
   LITTER_CLEAN_COUNT,
   MAX_CHAPTER,
   ONGOING_UNLOCK_QUEST,
+  PARCEL_START,
   QUESTS,
   TOXIC_DELAY_SECONDS,
   TOXIC_INITIAL_FIELD,
@@ -10,6 +11,7 @@ import {
   type QuestDef,
   type Requirement,
 } from './balance';
+import { connectedCount } from './network';
 import type { GameState } from './state';
 
 export function requirementProgress(s: GameState, r: Requirement): number {
@@ -21,6 +23,8 @@ export function requirementProgress(s: GameState, r: Requirement): number {
   if (r.kind === 'fieldclean') return s.toxic && s.toxicDisposed > 0 && s.toxicField < 0.5 ? 1 : 0;
   if (r.kind === 'trust') return s.trust;
   if (r.kind === 'litter') return s.litterCleaned;
+  if (r.kind === 'building') return r.building ? connectedCount(s, r.building) : 0;
+  if (r.kind === 'parcels') return s.unlockedParcels.length - PARCEL_START.length;
   if (r.kind === 'toxic') return s.toxic ? 1 : 0;
   if (r.kind === 'litterpile') return s.litter.length;
   if (r.kind === 'litterlow') return s.litter.length <= LITTER_CLEAN_COUNT ? 1 : 0;

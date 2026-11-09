@@ -17,6 +17,8 @@ import {
   LINE_UPGRADE_MW,
   OVERLOAD_TOLERANCE_SECONDS,
   PRESTIGE_THRESHOLDS_MWH,
+  ROAD_PRICE_BONUS_MAX,
+  ROAD_PRICE_BONUS_PER_TILE,
   SECONDS_PER_GAME_HOUR,
   SOLAR_MW_PER_LEVEL,
   STORAGE_PER_LEVEL,
@@ -30,6 +32,7 @@ import {
 } from './balance';
 import { sunFactor } from './daynight';
 import { incineratorNominalMW, voPerMWh } from './economy';
+import { connectedCount } from './network';
 import type { GameState } from './state';
 
 export function prestige(s: GameState): number {
@@ -43,12 +46,14 @@ export function prestige(s: GameState): number {
 export const lineCapacityMW = (s: GameState) => LINE_BASE_CAPACITY_MW + s.upgrades.line * LINE_UPGRADE_MW;
 export { incineratorNominalMW };
 export const dumpCapacityMW = (s: GameState) => s.upgrades.dump * DUMP_MW_PER_LEVEL;
-export const batteryCapacityMWh = (s: GameState) => s.upgrades.battery * BATTERY_CAPACITY_PER_LEVEL_MWH;
-export const batteryRateMW = (s: GameState) => s.upgrades.battery * BATTERY_RATE_PER_LEVEL_MW;
+export const batteryCapacityMWh = (s: GameState) => connectedCount(s, 'battery') * BATTERY_CAPACITY_PER_LEVEL_MWH;
+export const batteryRateMW = (s: GameState) => connectedCount(s, 'battery') * BATTERY_RATE_PER_LEVEL_MW;
+// Prestiž z cest: každá napojená cesta zvedá cenu energie, nejvýš o ROAD_PRICE_BONUS_MAX
+export const roadPriceBonus = (s: GameState) => Math.min(ROAD_PRICE_BONUS_MAX, connectedCount(s, 'road') * ROAD_PRICE_BONUS_PER_TILE);
 export const solarCapacityMW = (s: GameState) => s.upgrades.solar * SOLAR_MW_PER_LEVEL;
 export const solarMW = (s: GameState) => solarCapacityMW(s) * sunFactor(s.hour); // jen ve dne
-export const storageCapacity = (s: GameState) => s.upgrades.storage * STORAGE_PER_LEVEL;
-export const disposeRate = (s: GameState) => s.upgrades.cleanup * DISPOSE_PER_LEVEL; // jednotek odpadu za sekundu
+export const storageCapacity = (s: GameState) => connectedCount(s, 'storage') * STORAGE_PER_LEVEL;
+export const disposeRate = (s: GameState) => connectedCount(s, 'disposer') * DISPOSE_PER_LEVEL; // jednotek odpadu za sekundu
 
 // Kapitola 1: smlouva, město odebírá stálých CONTRACT_MW bez ohledu na den a noc (den a noc je zatím jen vizuální).
 // Prestiž zvedá odběr až po konci kapitoly 1 (prestiž 2 je od 500 MWh).
@@ -161,6 +166,7 @@ export function runPower(s: GameState, dt: number): void {
   const fieldFrac = s.toxic ? Math.min(1, s.toxicField / TOXIC_FIELD_FULL) : 0;
   let priceFactor = 1 - (1 - TOXIC_INCOME_FACTOR) * fieldFrac;
   if (s.chapter >= 3) priceFactor *= 1 + (TRUST_PRICE_BONUS * s.trust) / 100;
+  priceFactor *= 1 + roadPriceBonus(s); // napojené cesty zvedají prestiž města
   const creditsPerMWh = CREDITS_PER_MWH * priceFactor;
   s.credits += mwh * creditsPerMWh;
 

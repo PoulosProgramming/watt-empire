@@ -77,12 +77,59 @@ export const TRUST_PRICE_BONUS = 0.2; // při 100 % důvěře město platí o 20
 // Dodané MWh potřebné pro prestiž 2, 3, 4 ... (kapitola 1 končí prestiží 2 po 500 MWh, GDD původně 100)
 export const PRESTIGE_THRESHOLDS_MWH = [0, 500, 1200, 2800, 6500];
 
-// ---- Vylepšení ----
-export type UpgradeId = 'worker' | 'power' | 'efficiency' | 'line' | 'battery' | 'dump' | 'regulator' | 'cleanup' | 'storage' | 'solar';
+// ---- Stavění na mapě ----
+// Budovy se stavějí na odemčené pevnině bez keřů a skal. Části soustav se propojují DOTYKEM po dlaždicích:
+//  - síť (dráty): zdroj/baterie funguje, když k němu vede souvislý řetěz vodivých dlaždic až do města;
+//  - cesty: sklad a likvidátor odpadu musí sousedit se spalovnou nebo s cestou, která ke spalovně vede.
+export type BuildingType = 'road' | 'wire' | 'storage' | 'disposer' | 'battery';
+export type BuildingNeeds = 'road' | 'grid' | null;
 
-// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu) | smlouva (dosažení smluvních MW) | kapitola | uklizený odpad na mapě | začala krize | mapa je čistá | ostrov je zaplevelený (hodně hromádek) | ostrov je čistý (málo hromádek)
+export interface BuildingDef {
+  type: BuildingType;
+  name: string;
+  emoji: string;
+  color: number; // barva čtverce na mapě
+  w: number; // šířka v dlaždicích
+  h: number; // výška v dlaždicích
+  baseCost: number;
+  growth: number; // cena × growth s každou už postavenou budovou téhož druhu
+  unlockChapter: number; // od které kapitoly se dá stavět
+  needs: BuildingNeeds; // čím musí být napojená, aby fungovala
+  conductive?: boolean; // vede proud (součást sítě)
+  description: string;
+}
+
+export const BUILDINGS: BuildingDef[] = [
+  { type: 'road', name: 'Cesta', emoji: '🛤️', color: 0x8b7d6b, w: 1, h: 1, baseCost: 15, growth: 1, unlockChapter: 2, needs: null, description: 'Vede odpad od spalovny ke skladu a likvidátoru. Čím víc cest, tím víc město zaplatí.' },
+  { type: 'wire', name: 'Drát', emoji: '⚡', color: 0xffd23f, w: 1, h: 1, baseCost: 25, growth: 1, unlockChapter: 3, needs: null, conductive: true, description: 'Propojí budovy se sítí. Musí se dotýkat až do města.' },
+  { type: 'storage', name: 'Sklad odpadu', emoji: '🛢️', color: 0x7c3aed, w: 2, h: 2, baseCost: 1500, growth: 1.5, unlockChapter: 2, needs: 'road', description: '+150 jednotek bezpečně uloženého odpadu. Musí sousedit se spalovnou nebo s cestou k ní.' },
+  { type: 'disposer', name: 'Likvidátor odpadu', emoji: '♻️', color: 0x16a34a, w: 2, h: 2, baseCost: 2000, growth: 1.5, unlockChapter: 2, needs: 'road', description: 'Ničí 0,5 jednotky odpadu za sekundu, každá jednotka stojí 3 kredity. Musí sousedit se spalovnou nebo s cestou k ní.' },
+  { type: 'battery', name: 'Baterie', emoji: '🔋', color: 0x0ea5e9, w: 2, h: 2, baseCost: 900, growth: 1.8, unlockChapter: 3, needs: 'grid', conductive: true, description: '+10 MWh uložiště, +3 MW. Musí být napojená drátem na síť do města.' },
+];
+export const ROAD_PRICE_BONUS_PER_TILE = 0.005; // každá napojená cesta zvedá cenu energie o 0,5 %
+export const ROAD_PRICE_BONUS_MAX = 0.1; // nejvýš o 10 %
+export const BUILDING_REFUND = 0.5; // při zbourání se vrátí tolik z ceny
+
+// ---- Parcely: dokupování území ----
+export const PARCEL_UNLOCK_CHAPTER = 2; // od které kapitoly se dají kupovat parcely (dřív není co stavět)
+export const PARCEL_BASE_COST = 1200; // cena první dokoupené parcely
+export const PARCEL_GROWTH = 1.35; // každá další je o tolik dražší
+export const PARCEL_MIN_LAND_TILES = 6; // parcela musí mít aspoň tolik pevniny (jinak je to voda nebo hory)
+
+// ---- Starší vylepšení, která se změnila na budovy (pro vrácení peněz ze starých uložení) ----
+export const LEGACY_UPGRADE_COSTS: Record<string, { baseCost: number; growth: number }> = {
+  battery: { baseCost: 900, growth: 1.8 },
+  cleanup: { baseCost: 2000, growth: 1.5 },
+  storage: { baseCost: 1500, growth: 1.5 },
+};
+
+// ---- Vylepšení ----
+export type UpgradeId = 'worker' | 'power' | 'efficiency' | 'line' | 'dump' | 'regulator' | 'solar';
+
+// Podmínka (pro úkoly i odemykání vylepšení): ruční tapy | dodané MWh | úroveň jiného vylepšení | autonomie (brigádníci zásobí spalovnu) | smlouva (dosažení smluvních MW) | kapitola | uklizený odpad na mapě | začala krize | mapa je čistá | ostrov je zaplevelený (hodně hromádek) | ostrov je čistý (málo hromádek) | počet připojených budov daného druhu | počet dokoupených parcel
 export interface Requirement {
-  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter' | 'disposed' | 'fieldclean' | 'trust' | 'litter' | 'toxic' | 'litterempty' | 'litterpile' | 'litterlow';
+  building?: BuildingType; // jen pro kind 'building'
+  kind: 'delivered' | 'taps' | 'upgrade' | 'autonomy' | 'contract' | 'chapter' | 'disposed' | 'fieldclean' | 'trust' | 'litter' | 'toxic' | 'litterempty' | 'litterpile' | 'litterlow' | 'building' | 'parcels';
   target: number;
   upgrade?: UpgradeId; // jen pro kind 'upgrade'
 }
@@ -105,9 +152,6 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'efficiency', name: 'Účinnost spalovny', description: 'Stejný výkon za méně VO (−10 % spotřeby odpadu)', baseCost: 400, growth: 1.9, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'worker', target: 2, text: 'po 2 brigádnících' }, group: 'incinerator' },
   { id: 'line', name: 'Dráty a trafo', description: '+3 MW propustnost', baseCost: 500, growth: 1.7, maxLevel: 10, unlock: { kind: 'upgrade', upgrade: 'power', target: 3, text: 'po výkonu spalovny 6 MW' } },
   { id: 'dump', name: 'Mařič přebytku', description: 'Spálí +2 MW přebytku, ale stojí 4💰 za každou MWh', baseCost: 500, growth: 1.7, maxLevel: 5, unlock: { kind: 'chapter', target: 3, text: 'v kapitole 3 (až bude přebytek z obnovitelných zdrojů)' } },
-  { id: 'battery', name: 'Baterie', description: '+10 MWh uložiště, +3 MW', baseCost: 900, growth: 1.8, maxLevel: 10, unlock: { kind: 'chapter', target: 3, text: 'v kapitole 3 (s obnovitelnými zdroji)' } },
-  { id: 'cleanup', name: 'Likvidátor odpadu', description: 'Ničí 0,5 jednotky toxického odpadu za sekundu, každá jednotka stojí 3💰', baseCost: 2000, growth: 1.5, maxLevel: 8, unlock: { kind: 'chapter', target: 2, text: 'v kapitole 2 (po ekologické katastrofě)' } },
-  { id: 'storage', name: 'Sklad toxického odpadu', description: '+150 jednotek bezpečně uloženého odpadu (neleží na poli)', baseCost: 1500, growth: 1.5, maxLevel: 8, unlock: { kind: 'chapter', target: 2, text: 'v kapitole 2 (po ekologické katastrofě)' } },
   { id: 'solar', name: 'Sluneční panely', description: '+2 MW čisté energie, ale jen ve dne', baseCost: 3000, growth: 1.45, maxLevel: 10, unlock: { kind: 'chapter', target: 3, text: 'v kapitole 3 (obnovitelné zdroje)' } },
   { id: 'regulator', name: 'Automatický regulátor', description: 'Spalovna sama drží výkon podle spotřeby města', baseCost: 12000, growth: 1, maxLevel: 1, unlock: { kind: 'chapter', target: 4, text: 'v kapitole 4 (regulace)' }, group: 'incinerator' },
 ];
@@ -152,20 +196,22 @@ export const QUESTS: QuestDef[] = [
   { id: 'contract', text: 'Splň smlouvu: dodej městu 15 MW', kind: 'contract', target: 1, reward: 5000 },
   { id: 'deliver400', text: 'Dodej městu 500 MWh (konec kapitoly 1)', kind: 'delivered', target: 500, reward: 2000 },
   // --- Kapitola 2: odpad a krize ---
-  { id: 'c2_cleanup', chapter: 2, text: 'Zareaguj na katastrofu: kup likvidátor odpadu', kind: 'upgrade', upgrade: 'cleanup', target: 1, reward: 1500 },
-  { id: 'c2_storage', chapter: 2, text: 'Přestaň vyhazovat odpad na pole: kup sklad toxického odpadu', kind: 'upgrade', upgrade: 'storage', target: 1, reward: 1500 },
+  { id: 'c2_parcel', chapter: 2, text: 'Rozšiř území: dokup první parcelu (menu 🏗️ Stavba)', kind: 'parcels', target: 1, reward: 1000 },
+  { id: 'c2_road', chapter: 2, text: 'Postav 8 cest od spalovny (odvoz odpadu)', kind: 'building', building: 'road', target: 8, reward: 1500 },
+  { id: 'c2_cleanup', chapter: 2, text: 'Zareaguj na katastrofu: postav likvidátor odpadu (musí sousedit se spalovnou nebo s cestou k ní)', kind: 'building', building: 'disposer', target: 1, reward: 1500 },
+  { id: 'c2_storage', chapter: 2, text: 'Přestaň vyhazovat odpad na pole: postav sklad toxického odpadu', kind: 'building', building: 'storage', target: 1, reward: 1500 },
   { id: 'c2_dispose300', chapter: 2, text: 'Zlikviduj 300 jednotek toxického odpadu', kind: 'disposed', target: 300, reward: 2500 },
   { id: 'c2_field', chapter: 2, text: 'Vyčisti pole: ať na poli nezůstane žádný toxický odpad', kind: 'fieldclean', target: 1, reward: 3000 },
   { id: 'c2_crew', chapter: 2, text: 'Zaměstnej úklidovou četu: 12 brigádníků na pravidelný úklid ostrova', kind: 'upgrade', upgrade: 'worker', target: 12, reward: 5000 },
   { id: 'c2_island', chapter: 2, text: 'Udrž ostrov čistý: na mapě nanejvýš 5 hromádek odpadu', kind: 'litterlow', target: 1, reward: 3000 },
-  { id: 'c2_cleanup3', chapter: 2, text: 'Posil likvidaci: likvidátor odpadu na úroveň 3', kind: 'upgrade', upgrade: 'cleanup', target: 3, reward: 3500 },
+  { id: 'c2_cleanup3', chapter: 2, text: 'Posil likvidaci: postav 3 likvidátory odpadu', kind: 'building', building: 'disposer', target: 3, reward: 3500 },
   { id: 'c2_power14', chapter: 2, text: 'Zvyš výkon spalovny na úroveň 14 (17 MW): čím víc vyrábíš, tím víc město odebírá', kind: 'upgrade', upgrade: 'power', target: 14, reward: 4000 },
   { id: 'c2_dispose1500', chapter: 2, text: 'Zlikviduj celkem 1500 jednotek toxického odpadu (konec kapitoly 2)', kind: 'disposed', target: 1500, reward: 6000 },
   // --- Kapitola 3: čistý zdroj a obnovitelné zdroje ---
   { id: 'c3_solar', chapter: 3, text: 'První obnovitelný zdroj: kup sluneční panely', kind: 'upgrade', upgrade: 'solar', target: 1, reward: 5000 },
   { id: 'c3_trust25', chapter: 3, text: 'Dej lidem důvod věřit: důvěra veřejnosti na 25 %', kind: 'trust', target: 25, reward: 6000 },
   { id: 'c3_line5', chapter: 3, text: 'Posil dráty a trafo na úroveň 5 (21 MW, polední špičky ze slunce)', kind: 'upgrade', upgrade: 'line', target: 5, reward: 5000 },
-  { id: 'c3_battery', chapter: 3, text: 'Kup baterii, ať polední špička nepřetíží síť', kind: 'upgrade', upgrade: 'battery', target: 1, reward: 6000 },
+  { id: 'c3_battery', chapter: 3, text: 'Postav baterii a napoj ji dráty do sítě, ať polední špička nepřetíží síť', kind: 'building', building: 'battery', target: 1, reward: 6000 },
   { id: 'c3_solar5', chapter: 3, text: 'Sluneční elektrárna: sluneční panely na úroveň 5', kind: 'upgrade', upgrade: 'solar', target: 5, reward: 8000 },
   { id: 'c3_trust60', chapter: 3, text: 'Důvěra veřejnosti na 60 %', kind: 'trust', target: 60, reward: 10000 },
   { id: 'c3_trust100', chapter: 3, text: 'Přesvědč veřejnost, že jsme čistý zdroj: důvěra na 100 % (konec kapitoly 3)', kind: 'trust', target: 100, reward: 20000 },
@@ -240,14 +286,15 @@ export const STORY_BEATS: StoryBeat[] = [
   { id: 's_toxic', trigger: { kind: 'toxic', target: 1 }, text: 'Co se to děje?! Spalovna vyplivla toxický odpad na pláž a lidé se bouří. Město odmítá platit plnou cenu za špinavou energii. Musíš to uklidit, jinak nám přestanou platit úplně!' },
   { id: 's_crew_start', trigger: { kind: 'chapter', target: 2 }, text: 'Lidé chtějí čistý ostrov. Zaměstnej úklidovou četu, dvanáct brigádníků, ať ostrov uklízí pravidelně. Ty se starej o spalovnu.' },
   { id: 's_crew12', trigger: { kind: 'upgrade', upgrade: 'worker', target: 12 }, text: 'Dvanáct lidí na úklid! Hned je na pláži vidět, že se o ni někdo stará. Díky!' },
-  { id: 's_cleanup1', trigger: { kind: 'upgrade', upgrade: 'cleanup', target: 1 }, text: 'Likvidátor odpadu, konečně se něco děje. Jen ať to nestojí celé město, každá jednotka něco stojí.' },
-  { id: 's_storage1', trigger: { kind: 'upgrade', upgrade: 'storage', target: 1 }, text: 'Aspoň část odpadu už neleží na poli. Děti si tam hrávaly. Prosím, ať tam už nic nezůstane.' },
+  { id: 's_cleanup1', trigger: { kind: 'building', building: 'disposer', target: 1 }, text: 'Likvidátor odpadu, konečně se něco děje. Jen ať to nestojí celé město, každá jednotka něco stojí.' },
+  { id: 's_storage1', trigger: { kind: 'building', building: 'storage', target: 1 }, text: 'Aspoň část odpadu už neleží na poli. Děti si tam hrávaly. Prosím, ať tam už nic nezůstane.' },
   { id: 's_field_clean', trigger: { kind: 'fieldclean', target: 1 }, text: 'Pole je čisté! Poprvé po dlouhé době se tam dá chodit. Lidé si trochu vydechli.' },
   { id: 's_disposed1000', trigger: { kind: 'disposed', target: 1000 }, text: 'Tolik odpadu pryč... Lidé se uklidňují, ale pořád říkají, že je to špinavá energie.' },
   // --- Kapitola 3: čistý zdroj ---
   { id: 's_chapter3', trigger: { kind: 'chapter', target: 3 }, text: 'Teď musíš lidi přesvědčit, že jsi čistý zdroj. Zkus slunce: panely nic nepálí a nezanechávají odpad. A hlavně žádný nový nepořádek na poli!' },
   { id: 's_solar1', trigger: { kind: 'upgrade', upgrade: 'solar', target: 1 }, text: 'Sluneční panely! Přes den to vydělá, ale v noci pořád potřebujeme spalovnu. Hlídej, ať polední slunce nepřetíží vedení.' },
-  { id: 's_battery1', trigger: { kind: 'upgrade', upgrade: 'battery', target: 1 }, text: 'Baterie! Polední špičky už se neztratí, uloží se na večer. To je chytré.' },
+  { id: 's_battery1', trigger: { kind: 'building', building: 'battery', target: 1 }, text: 'Baterie! Polední špičky už se neztratí, uloží se na večer. To je chytré.' },
+  { id: 's_parcel1', trigger: { kind: 'parcels', target: 1 }, text: 'Další kus země je náš! Teď tam něco postav, ať se nezapomene, že vlastníme víc, než umíme využít.' },
   { id: 's_trust25', trigger: { kind: 'trust', target: 25 }, text: 'Lidé o tobě začínají mluvit hezky. Je to teprve začátek, ale mám radost.' },
   { id: 's_trust60', trigger: { kind: 'trust', target: 60 }, text: 'Už tě zdraví na ulici! Skoro nikdo neříká špinavá energie. Pokračuj.' },
   { id: 's_trust100', trigger: { kind: 'trust', target: 100 }, text: 'Důvěra veřejnosti je na sto procent! Dokázal jsi, že ostrov má čistý zdroj. Jsi hrdina tohoto ostrova.' },

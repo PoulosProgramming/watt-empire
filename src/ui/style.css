@@ -79,3 +79,18 @@ small { color: #94a3b8; }
 .dialog .dlg-ok { min-height: 44px; padding: 0 22px; float: right; background: #d97706; }
 .mayor-msg { margin: 0 0 8px; font-size: 13px; line-height: 1.4; color: #cbd5e1; }
 @keyframes dlg-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+#modebar { display: none; align-self: flex-start; background: rgba(120, 53, 15, .95); border: 2px solid #f59e0b; border-radius: 12px; padding: 6px 10px; font-size: 14px; line-height: 1.5; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+#modebar .modeoff { min-height: 44px; margin-left: 6px; padding: 0 12px; background: #b45309; font-size: 14px; }
+.bld { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 8px; padding: 10px 12px; background: #334155; border-radius: 10px; min-height: 56px; font-weight: 400; }
+.bld.sel { outline: 2px solid #60a5fa; background: #1e3a5f; }
+.bld.locked { opacity: .55; display: block; font-size: 14px; }
+.bld.locked small { display: block; }
+.bld-ico { font-size: 28px; flex: 0 0 auto; }
+.bld-txt { flex: 1; min-width: 0; }
+.bld-txt b { display: block; font-size: 15px; }
+.bld-txt small { display: block; color: #cbd5e1; font-size: 12px; line-height: 1.35; }
+.bld-cost { flex: 0 0 auto; font-weight: 700; font-size: 15px; }
+.bld-cost.poor { color: #f87171; }
+.bld-status { display: block; margin-bottom: 8px; }
+.modal-cancel { width: 100%; min-height: 48px; margin-top: 8px; background: #475569; font-size: 16px; }
